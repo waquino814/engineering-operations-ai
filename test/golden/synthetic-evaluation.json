@@ -1,0 +1,401 @@
+{
+  "schemaVersion": "0.1.0",
+  "cases": [
+    {
+      "id": "excerpt-correct",
+      "kind": "synthetic",
+      "summary": {
+        "caseId": "ec2275bde9750840",
+        "outcome": "completed",
+        "failureClass": null,
+        "findings": 2,
+        "findingsByKind": {
+          "root_cause": 1,
+          "affected_component": 1
+        },
+        "references": 3,
+        "remediationSteps": 1,
+        "limitations": 0,
+        "usage": {
+          "modelCalls": 1,
+          "repairAttempts": 0,
+          "retries": 0,
+          "inputTokens": 6200,
+          "outputTokens": 410,
+          "chargedTokens": 6610,
+          "unreportedCalls": 0,
+          "inconsistentReports": 0,
+          "tokenAccounting": "reported"
+        },
+        "selectedRecords": 8
+      },
+      "score": {
+        "outcome": "completed",
+        "rootCause": "correct",
+        "affected": {
+          "predicted": [
+            "payment-provider",
+            "worker"
+          ],
+          "expected": [
+            "payment-provider",
+            "worker"
+          ],
+          "precision": 1,
+          "recall": 1
+        }
+      },
+      "resultValid": true,
+      "answerLeak": {
+        "checkedRequests": 1,
+        "checkedValues": 54,
+        "legitimatelyPresent": 6,
+        "leaked": false,
+        "findings": []
+      }
+    },
+    {
+      "id": "excerpt-wrong-root-cause",
+      "kind": "synthetic",
+      "summary": {
+        "caseId": "ec2275bde9750840",
+        "outcome": "completed",
+        "failureClass": null,
+        "findings": 1,
+        "findingsByKind": {
+          "root_cause": 1
+        },
+        "references": 1,
+        "remediationSteps": 0,
+        "limitations": 0,
+        "usage": {
+          "modelCalls": 1,
+          "repairAttempts": 0,
+          "retries": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "chargedTokens": 204000,
+          "unreportedCalls": 1,
+          "inconsistentReports": 0,
+          "tokenAccounting": "estimated"
+        },
+        "selectedRecords": 8
+      },
+      "score": {
+        "outcome": "completed",
+        "rootCause": "incorrect",
+        "affected": {
+          "predicted": [
+            "orders-api"
+          ],
+          "expected": [
+            "payment-provider",
+            "worker"
+          ],
+          "precision": 0,
+          "recall": 0
+        }
+      },
+      "resultValid": true,
+      "answerLeak": {
+        "checkedRequests": 1,
+        "checkedValues": 54,
+        "legitimatelyPresent": 6,
+        "leaked": false,
+        "findings": []
+      }
+    },
+    {
+      "id": "excerpt-repaired-reply",
+      "kind": "synthetic",
+      "summary": {
+        "caseId": "ec2275bde9750840",
+        "outcome": "completed",
+        "failureClass": null,
+        "findings": 2,
+        "findingsByKind": {
+          "root_cause": 1,
+          "affected_component": 1
+        },
+        "references": 3,
+        "remediationSteps": 1,
+        "limitations": 0,
+        "usage": {
+          "modelCalls": 2,
+          "repairAttempts": 1,
+          "retries": 0,
+          "inputTokens": 12500,
+          "outputTokens": 422,
+          "chargedTokens": 12922,
+          "unreportedCalls": 0,
+          "inconsistentReports": 0,
+          "tokenAccounting": "reported"
+        },
+        "selectedRecords": 8
+      },
+      "score": {
+        "outcome": "completed",
+        "rootCause": "correct",
+        "affected": {
+          "predicted": [
+            "payment-provider",
+            "worker"
+          ],
+          "expected": [
+            "payment-provider",
+            "worker"
+          ],
+          "precision": 1,
+          "recall": 1
+        }
+      },
+      "resultValid": true,
+      "answerLeak": {
+        "checkedRequests": 2,
+        "checkedValues": 54,
+        "legitimatelyPresent": 6,
+        "leaked": false,
+        "findings": []
+      }
+    },
+    {
+      "id": "excerpt-fabricated-evidence",
+      "kind": "synthetic",
+      "summary": {
+        "caseId": "ec2275bde9750840",
+        "outcome": "failed",
+        "failureClass": "evidence_verification_failed",
+        "findings": 0,
+        "findingsByKind": {},
+        "references": 0,
+        "remediationSteps": 0,
+        "limitations": 0,
+        "usage": {
+          "modelCalls": 2,
+          "repairAttempts": 1,
+          "retries": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "chargedTokens": 408000,
+          "unreportedCalls": 2,
+          "inconsistentReports": 0,
+          "tokenAccounting": "estimated"
+        },
+        "selectedRecords": 8
+      },
+      "score": {
+        "outcome": "failed",
+        "rootCause": "missing",
+        "affected": {
+          "predicted": [],
+          "expected": [
+            "payment-provider",
+            "worker"
+          ],
+          "precision": null,
+          "recall": 0
+        }
+      },
+      "resultValid": true,
+      "answerLeak": {
+        "checkedRequests": 2,
+        "checkedValues": 54,
+        "legitimatelyPresent": 6,
+        "leaked": false,
+        "findings": []
+      }
+    },
+    {
+      "id": "excerpt-inconclusive",
+      "kind": "synthetic",
+      "summary": {
+        "caseId": "ec2275bde9750840",
+        "outcome": "inconclusive",
+        "failureClass": null,
+        "findings": 0,
+        "findingsByKind": {},
+        "references": 0,
+        "remediationSteps": 0,
+        "limitations": 1,
+        "usage": {
+          "modelCalls": 1,
+          "repairAttempts": 0,
+          "retries": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "chargedTokens": 204000,
+          "unreportedCalls": 1,
+          "inconsistentReports": 0,
+          "tokenAccounting": "estimated"
+        },
+        "selectedRecords": 8
+      },
+      "score": {
+        "outcome": "inconclusive",
+        "rootCause": "missing",
+        "affected": {
+          "predicted": [],
+          "expected": [
+            "payment-provider",
+            "worker"
+          ],
+          "precision": null,
+          "recall": 0
+        }
+      },
+      "resultValid": true,
+      "answerLeak": {
+        "checkedRequests": 1,
+        "checkedValues": 54,
+        "legitimatelyPresent": 6,
+        "leaked": false,
+        "findings": []
+      }
+    },
+    {
+      "id": "fabricated-correct",
+      "kind": "synthetic",
+      "summary": {
+        "caseId": "b70b149f892fa3b9",
+        "outcome": "completed",
+        "failureClass": null,
+        "findings": 2,
+        "findingsByKind": {
+          "root_cause": 1,
+          "affected_component": 1
+        },
+        "references": 4,
+        "remediationSteps": 1,
+        "limitations": 0,
+        "usage": {
+          "modelCalls": 1,
+          "repairAttempts": 0,
+          "retries": 0,
+          "inputTokens": 1900,
+          "outputTokens": 380,
+          "chargedTokens": 2280,
+          "unreportedCalls": 0,
+          "inconsistentReports": 0,
+          "tokenAccounting": "reported"
+        },
+        "selectedRecords": 10
+      },
+      "score": {
+        "outcome": "completed",
+        "rootCause": "correct",
+        "affected": {
+          "predicted": [
+            "cache-node",
+            "orders-api"
+          ],
+          "expected": [
+            "cache-node",
+            "orders-api"
+          ],
+          "precision": 1,
+          "recall": 1
+        }
+      },
+      "resultValid": true,
+      "answerLeak": {
+        "checkedRequests": 1,
+        "checkedValues": 48,
+        "legitimatelyPresent": 5,
+        "leaked": false,
+        "findings": []
+      }
+    },
+    {
+      "id": "fabricated-provider-down",
+      "kind": "synthetic",
+      "summary": {
+        "caseId": "b70b149f892fa3b9",
+        "outcome": "failed",
+        "failureClass": "provider_unavailable",
+        "findings": 0,
+        "findingsByKind": {},
+        "references": 0,
+        "remediationSteps": 0,
+        "limitations": 0,
+        "usage": {
+          "modelCalls": 3,
+          "repairAttempts": 0,
+          "retries": 2,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "chargedTokens": 612000,
+          "unreportedCalls": 3,
+          "inconsistentReports": 0,
+          "tokenAccounting": "estimated"
+        },
+        "selectedRecords": 10
+      },
+      "score": {
+        "outcome": "failed",
+        "rootCause": "missing",
+        "affected": {
+          "predicted": [],
+          "expected": [
+            "cache-node",
+            "orders-api"
+          ],
+          "precision": null,
+          "recall": 0
+        }
+      },
+      "resultValid": true,
+      "answerLeak": {
+        "checkedRequests": 3,
+        "checkedValues": 48,
+        "legitimatelyPresent": 5,
+        "leaked": false,
+        "findings": []
+      }
+    },
+    {
+      "id": "tampered-bundle",
+      "kind": "synthetic",
+      "summary": {
+        "caseId": null,
+        "outcome": "failed",
+        "failureClass": "invalid_bundle",
+        "findings": 0,
+        "findingsByKind": {},
+        "references": 0,
+        "remediationSteps": 0,
+        "limitations": 0,
+        "usage": {
+          "modelCalls": 0,
+          "repairAttempts": 0,
+          "retries": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "chargedTokens": 0,
+          "unreportedCalls": 0,
+          "inconsistentReports": 0,
+          "tokenAccounting": "reported"
+        },
+        "selectedRecords": null
+      },
+      "score": null,
+      "resultValid": true,
+      "answerLeak": {
+        "checkedRequests": 0,
+        "checkedValues": 59,
+        "legitimatelyPresent": 1,
+        "leaked": false,
+        "findings": []
+      }
+    }
+  ],
+  "totals": {
+    "cases": 8,
+    "byOutcome": {
+      "completed": 4,
+      "failed": 3,
+      "inconclusive": 1
+    },
+    "rootCauseCorrect": 3,
+    "answerLeaks": 0
+  }
+}

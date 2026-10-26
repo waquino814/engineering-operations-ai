@@ -283,13 +283,18 @@ describe('the source tree', () => {
     const mentions = (await sources())
       .filter(({ text }) => /ground_truth|GROUND_TRUTH_FILE|groundTruth/.test(text))
       .map(({ file }) => file);
-    expect(mentions.sort()).toEqual(['intake/contract.ts', 'intake/validate-bundle.ts']);
+    // E2 adds the scoring boundary, which reads the answer key by design (ADR 0009);
+    // test/architecture.test.ts keeps it out of the investigation layer.
+    expect(mentions.filter((f) => !f.startsWith('evaluation/')).sort()).toEqual([
+      'intake/contract.ts',
+      'intake/validate-bundle.ts',
+    ]);
   });
 
   it('keeps contract validation out of the evidence path', async () => {
     const importers = (await sources())
-      .filter(({ text }) => /from '\.\/(intake\/)?validate-bundle\.ts'/.test(text))
+      .filter(({ text }) => /from '(\.\.\/|\.\/)(intake\/)?validate-bundle\.ts'/.test(text))
       .map(({ file }) => file);
-    expect(importers.sort()).toEqual(['cli.ts', 'index.ts']);
+    expect(importers.sort()).toEqual(['cli.ts', 'index.ts', 'pipeline/run-investigation.ts']);
   });
 });

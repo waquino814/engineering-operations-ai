@@ -6,7 +6,12 @@ Its first evidence source is [Commerce Platform](https://github.com/waquino814/c
 
 ## Status
 
-**E1 in progress.** The first component, **bundle intake**, is implemented and tested: it validates incident bundles against the vendored contract (all nine rules) and opens a blinded evidence view that never reads the ground truth. See [docs/intake.md](docs/intake.md). Its architecture decisions, [ADRs 0001 to 0005](docs/adr/README.md), were **accepted** by the owner on 2026-10-26. There is no investigation, evaluation or UI code yet.
+**E1 complete; the E2/E3 foundation is in progress.**
+
+- **Bundle intake** (E1) validates incident bundles against the vendored contract (all nine rules) and opens a blinded evidence view that never reads the ground truth ([docs/intake.md](docs/intake.md)). [ADRs 0001 to 0005](docs/adr/README.md) were **accepted** by the owner on 2026-10-26.
+- **The investigation workflow** (E2 foundation) runs end to end against a deterministic fake model: admission, blinding, evidence selection, one bounded model request, strict output validation, evidence-reference verification, bounded repair and retries, and a schema-checked result. **No real model provider is integrated**, so no real diagnosis has been produced.
+- **The evaluation harness** (E3 foundation) scores results against the ground truth behind a separate boundary, checks every model request for answer leaks, and produces a deterministic report from eight synthetic cases ([docs/evaluation.md](docs/evaluation.md)).
+- Their decisions, [ADRs 0006 to 0010](docs/adr/README.md), are **proposed**, not approved; ADR 0010 includes an amendment to accepted ADR 0004 that the code already follows. There is no UI code.
 
 TypeScript on Node.js 24, with pnpm ([ADR 0001](docs/adr/0001-runtime-and-language.md)):
 
@@ -14,7 +19,28 @@ TypeScript on Node.js 24, with pnpm ([ADR 0001](docs/adr/0001-runtime-and-langua
 pnpm install
 pnpm check                              # format, lint, typecheck, tests with coverage
 pnpm validate-bundle <bundle-dir>       # validate a bundle; exit 0 valid, 1 invalid
+pnpm eval:synthetic                     # synthetic evaluation report; exit 1 on an answer leak
 ```
+
+## How an investigation runs
+
+```
+bundle dir ─▶ validateBundle ─▶ openEvidence ─▶ selectEvidence ─▶ ModelProvider ─▶ parse + verify ─▶ result
+ (pipeline)    (reads answer     (blinded view,   (deterministic,   (fake in tests;  (repair once if
+               key; report       no path, no      bounded)          no real adapter  invalid)
+               stays here)       answer key)                        yet)
+                                                                                     evaluation reads the
+                                                                                     answer key afterwards
+```
+
+| Module                                     | Role                                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| [`src/intake/`](src/intake/)               | bundle validation and the blinded evidence view                                          |
+| [`src/pipeline/`](src/pipeline/)           | `runInvestigation(bundleDir, options)`: admission, then the investigator                 |
+| [`src/investigation/`](src/investigation/) | limits, model port and fake, selection, request, parsing, verification, the investigator |
+| [`src/evaluation/`](src/evaluation/)       | answer key, scoring, the harness, synthetic cases (package entry `./evaluation`)         |
+
+See [docs/architecture.md](docs/architecture.md) for the boundaries and the data flow, and [docs/testing.md](docs/testing.md) for the testing policy: every feature or fix ships with tests in the same change.
 
 ## Continuous integration
 
@@ -35,14 +61,17 @@ pnpm check
 
 ## Documentation
 
-| Document                                                                    | Content                                                                  |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [docs/architecture.md](docs/architecture.md)                                | Intended system, its boundary with Commerce Platform, and open decisions |
-| [docs/intake.md](docs/intake.md)                                            | The bundle intake module: interface, rules, commands, limitations        |
-| [docs/roadmap.md](docs/roadmap.md)                                          | Milestones: the investigation backend first, the investigation UI after  |
-| [docs/contracts/incident-bundle/](docs/contracts/incident-bundle/README.md) | The incident-bundle v1 contract: JSON Schema files and a consumer guide  |
-| [docs/examples/](docs/examples/README.md)                                   | A genuine excerpt of a validated Commerce Platform bundle                |
-| [docs/adr/](docs/adr/README.md)                                             | Decision records, including those transferred from Commerce Platform     |
+| Document                                                                        | Content                                                                  |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [docs/architecture.md](docs/architecture.md)                                    | Intended system, its boundary with Commerce Platform, and open decisions |
+| [docs/intake.md](docs/intake.md)                                                | The bundle intake module: interface, rules, commands, limitations        |
+| [docs/testing.md](docs/testing.md)                                              | Testing policy, coverage guard, test layers, fakes                       |
+| [docs/evaluation.md](docs/evaluation.md)                                        | Evaluation harness, scoring v0, synthetic cases, holdout strategy        |
+| [docs/contracts/investigation-result/](docs/contracts/investigation-result/v0/) | The investigation result and model-output JSON Schemas, v0.1.0           |
+| [docs/roadmap.md](docs/roadmap.md)                                              | Milestones: the investigation backend first, the investigation UI after  |
+| [docs/contracts/incident-bundle/](docs/contracts/incident-bundle/README.md)     | The incident-bundle v1 contract: JSON Schema files and a consumer guide  |
+| [docs/examples/](docs/examples/README.md)                                       | A genuine excerpt of a validated Commerce Platform bundle                |
+| [docs/adr/](docs/adr/README.md)                                                 | Decision records, including those transferred from Commerce Platform     |
 
 ## Getting incident bundles
 

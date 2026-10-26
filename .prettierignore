@@ -4,3 +4,5 @@ pnpm-lock.yaml
 docs/contracts/incident-bundle/v1/
 docs/adr/commerce-platform/
 docs/examples/
+# Byte-exact golden output, compared by tests.
+test/golden/

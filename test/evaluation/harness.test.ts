@@ -1,0 +1,219 @@
+import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { describe, expect, it } from 'vitest';
+import {
+  readAnswerKey,
+  runEvaluation,
+  runSyntheticEvaluation,
+  scoreResult,
+} from '../../src/evaluation/index.ts';
+import { isEntryPoint, main } from '../../src/evaluation/cli.ts';
+import { FakeProvider } from '../../src/index.ts';
+import type { InvestigationResult } from '../../src/investigation/result.ts';
+import { makeBundle } from '../support.ts';
+import { bundles, goodOutput } from '../investigation/support.ts';
+import { openEvidence } from '../../src/index.ts';
+
+/** ADR 0009: the deterministic evaluation harness and the scoring boundary. */
+const GOLDEN = new URL('../golden/synthetic-evaluation.json', import.meta.url);
+
+describe('the synthetic evaluation', () => {
+  it('matches the committed golden report exactly', async () => {
+    const report = await runSyntheticEvaluation();
+    expect(`${JSON.stringify(report, null, 2)}\n`).toBe(await readFile(GOLDEN, 'utf8'));
+  });
+
+  it('covers every pipeline path, cites only resolving evidence, and leaks no answer', async () => {
+    const report = await runSyntheticEvaluation();
+    expect(
+      report.cases.map((c) => [
+        c.id,
+        c.summary.outcome,
+        c.summary.failureClass,
+        c.score?.rootCause ?? null,
+      ]),
+    ).toEqual([
+      ['excerpt-correct', 'completed', null, 'correct'],
+      ['excerpt-wrong-root-cause', 'completed', null, 'incorrect'],
+      ['excerpt-repaired-reply', 'completed', null, 'correct'],
+      ['excerpt-fabricated-evidence', 'failed', 'evidence_verification_failed', 'missing'],
+      ['excerpt-inconclusive', 'inconclusive', null, 'missing'],
+      ['fabricated-correct', 'completed', null, 'correct'],
+      ['fabricated-provider-down', 'failed', 'provider_unavailable', 'missing'],
+      ['tampered-bundle', 'failed', 'invalid_bundle', null],
+    ]);
+    expect(report.totals).toEqual({
+      cases: 8,
+      byOutcome: { completed: 4, failed: 3, inconclusive: 1 },
+      rootCauseCorrect: 3,
+      answerLeaks: 0,
+    });
+    expect(report.cases.every((c) => c.kind === 'synthetic')).toBe(true);
+    expect(report.cases.every((c) => !c.answerLeak.leaked)).toBe(true);
+  });
+
+  it('runs as a program and prints the same report', async () => {
+    const cli = new URL('../../src/evaluation/cli.ts', import.meta.url).pathname;
+    const { stdout } = await promisify(execFile)('node', [cli]);
+    expect(stdout).toBe(await readFile(GOLDEN, 'utf8'));
+  });
+});
+
+describe('the evaluation command', () => {
+  it('prints the report and exits 0, or 1 when any answer leaked', async () => {
+    let out = '';
+    const writer = { write: (t: string) => (out += t) };
+    expect(await main(writer)).toBe(0);
+    expect(out).toBe(await readFile(GOLDEN, 'utf8'));
+    const leaky = await runSyntheticEvaluation();
+    leaky.totals.answerLeaks = 1;
+    expect(await main(writer, () => Promise.resolve(leaky))).toBe(1);
+  });
+
+  it('recognises when it is the program being run', () => {
+    const url = new URL('../../src/evaluation/cli.ts', import.meta.url);
+    expect(isEntryPoint(url.href, url.pathname)).toBe(true);
+    expect(isEntryPoint(url.href, '/somewhere/else.ts')).toBe(false);
+    expect(isEntryPoint(url.href, undefined)).toBe(false);
+  });
+});
+
+describe('the leak check', () => {
+  const leakyRun = async (message: (truth: Record<string, unknown>) => string) => {
+    const truth = JSON.parse(
+      await readFile(join((await bundles()).excerpt, 'ground_truth.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    const log = JSON.parse(
+      (await readFile(join((await bundles()).excerpt, 'logs.jsonl'), 'utf8')).split('\n')[0] ??
+        '{}',
+    ) as Record<string, unknown>;
+    const dir = await makeBundle({
+      files: { 'logs.jsonl': `${JSON.stringify({ ...log, message: message(truth) })}\n` },
+    });
+    const view = await openEvidence(dir);
+    const reply = goodOutput(view, {
+      findings: [],
+      outcome: 'inconclusive',
+      remediation: [],
+      limitations: ['x'],
+    });
+    return runEvaluation([
+      {
+        id: 'leaky',
+        kind: 'synthetic',
+        bundleDir: dir,
+        provider: new FakeProvider([{ reply }]),
+      },
+    ]);
+  };
+
+  it('detects a transformed scenario name carried into a request by the telemetry', async () => {
+    // A producer leak: a log message spells the scenario name differently. The check must see
+    // through the change of case and separators.
+    const report = await leakyRun((t) =>
+      (t.scenario as { name: string }).name.toUpperCase().replace('-', ' '),
+    );
+    expect(report.cases[0]?.answerLeak).toMatchObject({
+      leaked: true,
+      findings: [{ channel: 'request', source: 'ground_truth.scenario.name', match: 'normalized' }],
+    });
+    expect(report.totals.answerLeaks).toBe(1);
+    expect(JSON.stringify(report)).not.toContain('PROVIDER OUTAGE');
+  });
+
+  it('detects answer text that reaches a model request', async () => {
+    // A bundle whose telemetry carries the ground truth's description: the check must see it.
+    const description = 'A deliberately leaking description used only by this test.';
+    const truth = JSON.parse(
+      await readFile(join((await bundles()).excerpt, 'ground_truth.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    const log = JSON.parse(
+      (await readFile(join((await bundles()).excerpt, 'logs.jsonl'), 'utf8')).split('\n')[0] ??
+        '{}',
+    ) as Record<string, unknown>;
+    const dir = await makeBundle({
+      files: {
+        'ground_truth.json': `${JSON.stringify({ ...truth, description })}\n`,
+        'logs.jsonl': `${JSON.stringify({ ...log, message: description })}\n`,
+      },
+    });
+    const view = await openEvidence(dir);
+    const report = await runEvaluation([
+      {
+        id: 'leaky',
+        kind: 'synthetic',
+        bundleDir: dir,
+        provider: new FakeProvider([
+          {
+            reply: goodOutput(view, {
+              findings: [],
+              outcome: 'inconclusive',
+              remediation: [],
+              limitations: ['x'],
+            }),
+          },
+        ]),
+      },
+    ]);
+    expect(report.cases[0]?.answerLeak).toMatchObject({
+      checkedRequests: 1,
+      leaked: true,
+      findings: [{ channel: 'request', source: 'ground_truth.description', match: 'exact' }],
+    });
+    expect(report.totals.answerLeaks).toBe(1);
+  });
+});
+
+describe('scoring', () => {
+  const key = {
+    scenario: 's',
+    rootCauseComponent: 'cache-node',
+    affectedComponents: ['cache-node', 'orders-api'],
+  };
+  const result = (findings: { kind: string; components: string[] }[]) =>
+    ({ outcome: 'completed', findings }) as unknown as InvestigationResult;
+
+  it('scores the root cause and the affected components separately', () => {
+    expect(
+      scoreResult(
+        result([
+          { kind: 'root_cause', components: ['cache-node'] },
+          { kind: 'symptom', components: ['orders-api', 'worker'] },
+        ]),
+        key,
+      ),
+    ).toEqual({
+      outcome: 'completed',
+      rootCause: 'correct',
+      affected: {
+        predicted: ['cache-node', 'orders-api', 'worker'],
+        expected: ['cache-node', 'orders-api'],
+        precision: 0.667,
+        recall: 1,
+      },
+    });
+    expect(
+      scoreResult(result([{ kind: 'root_cause', components: ['worker'] }]), key).rootCause,
+    ).toBe('incorrect');
+    expect(scoreResult(result([]), key)).toMatchObject({
+      rootCause: 'missing',
+      affected: { precision: null, recall: 0 },
+    });
+    expect(scoreResult(result([]), { ...key, affectedComponents: [] }).affected.recall).toBe(1);
+  });
+
+  it('reads the answer key only through the scoring boundary, and validates it', async () => {
+    const key2 = await readAnswerKey((await bundles()).fabricated);
+    expect(key2).toMatchObject({
+      scenario: 'synthetic-cache-saturation',
+      rootCauseComponent: 'cache-node',
+      affectedComponents: ['cache-node', 'orders-api'],
+    });
+    const broken = await makeBundle({ files: { 'ground_truth.json': '{}\n' } });
+    await expect(readAnswerKey(broken)).rejects.toThrow(
+      'ground_truth.json does not match its schema',
+    );
+  });
+});
