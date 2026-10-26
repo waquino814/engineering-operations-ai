@@ -16,6 +16,17 @@ pnpm check                              # format, lint, typecheck, tests with co
 pnpm validate-bundle <bundle-dir>       # validate a bundle; exit 0 valid, 1 invalid
 ```
 
+## Continuous integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the quality gates on every pull request to `main`, every push to `main`, and on demand (`workflow_dispatch`). It installs the pinned toolchain (Node.js from `.nvmrc`, pnpm from `packageManager`), installs dependencies from the committed lockfile, and runs `pnpm check`: formatting, lint, typecheck, and the tests with their coverage thresholds. It needs only this repository: no Commerce Platform checkout, service, secret or AI provider. Its token can only read the repository.
+
+To reproduce it locally from a clean clone:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm check
+```
+
 ## Boundaries
 
 - **Independent repository.** Its own dependencies, build, tests, CI and releases. It never imports Commerce Platform's code, packages or build output, and never reaches outside its own directory.
