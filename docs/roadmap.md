@@ -23,6 +23,16 @@ Commerce Platform's portfolio order:
 
 ## E1: Technology decisions and bundle intake
 
+**Status: in progress (2026-10-26).**
+
+- [x] Decisions recorded as ADRs 0001 to 0005 ([index](adr/README.md)): runtime and language, AI provider policy, ground-truth isolation, investigation result contract, bundle intake. **Accepted by the owner on 2026-10-26.**
+- [x] Bundle intake implemented ([docs/intake.md](intake.md)): the nine contract rules, structured and deterministic issues, unsupported majors refused, unknown fields accepted.
+- [x] Tests: each rule, positive and negative, missing and malformed files, the isolation boundary, and the CLI, on small synthetic fixtures built from the committed example.
+- [x] The owner approved ADRs 0001 to 0005 (2026-10-26).
+- [ ] A real Commerce Platform bundle copied into a fresh clone validates. A real bundle has validated read in place; the fresh-clone check needs this work committed.
+
+Original scope:
+
 - Decide, as ADRs, the open questions that block code: language and runtime, JSON Schema validator, local-first or not, and ground-truth isolation ([architecture](architecture.md#open-decisions)).
 - Load a bundle directory and validate it against the vendored v1 schemas and the cross-file rules in the [consumer guide](contracts/incident-bundle/README.md), naming the file and field of each defect.
 - Refuse unsupported major versions; accept unknown fields and unknown scenario or component names.

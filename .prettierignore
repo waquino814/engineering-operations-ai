@@ -1,0 +1,6 @@
+coverage/
+pnpm-lock.yaml
+# Verbatim copies from Commerce Platform: their bytes are pinned by checksum (provenance).
+docs/contracts/incident-bundle/v1/
+docs/adr/commerce-platform/
+docs/examples/

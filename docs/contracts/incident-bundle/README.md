@@ -6,13 +6,13 @@ The contract between Commerce Platform, which writes incident bundles, and this 
 
 Copied unchanged from <https://github.com/waquino814/commerce-platform> at commit `93ad2131255eed89baa4d3ba67cbf649a49925ee` on 2026-10-26. Upstream they are generated from Commerce Platform's Zod schemas, and a drift test keeps them in step; here they are a pinned copy.
 
-| File | Validates | Original path | SHA-256 |
-| --- | --- | --- | --- |
-| [v1/manifest.schema.json](v1/manifest.schema.json) | `manifest.json` | `docs/schemas/incident-bundle/v1/manifest.schema.json` | `5a0f6e3f153ea71b3187318302538da3e887a1bed202164a36afe475d46b9d8d` |
-| [v1/ground-truth.schema.json](v1/ground-truth.schema.json) | `ground_truth.json` | `docs/schemas/incident-bundle/v1/ground-truth.schema.json` | `589b08c5d4de52cb960a0fabe50829525babf6b0c3230286371e061e9456b441` |
-| [v1/trace-record.schema.json](v1/trace-record.schema.json) | each line of `traces.jsonl` | `docs/schemas/incident-bundle/v1/trace-record.schema.json` | `fdd5760206bb2ea0dfa6a27f55f5a0eded854669509f6fcbfd245d62de081bc1` |
+| File                                                           | Validates                    | Original path                                                | SHA-256                                                            |
+| -------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| [v1/manifest.schema.json](v1/manifest.schema.json)             | `manifest.json`              | `docs/schemas/incident-bundle/v1/manifest.schema.json`       | `5a0f6e3f153ea71b3187318302538da3e887a1bed202164a36afe475d46b9d8d` |
+| [v1/ground-truth.schema.json](v1/ground-truth.schema.json)     | `ground_truth.json`          | `docs/schemas/incident-bundle/v1/ground-truth.schema.json`   | `589b08c5d4de52cb960a0fabe50829525babf6b0c3230286371e061e9456b441` |
+| [v1/trace-record.schema.json](v1/trace-record.schema.json)     | each line of `traces.jsonl`  | `docs/schemas/incident-bundle/v1/trace-record.schema.json`   | `fdd5760206bb2ea0dfa6a27f55f5a0eded854669509f6fcbfd245d62de081bc1` |
 | [v1/metrics-record.schema.json](v1/metrics-record.schema.json) | each line of `metrics.jsonl` | `docs/schemas/incident-bundle/v1/metrics-record.schema.json` | `504d29b675f48874e84b42893dec9778f2b99f8938f2decf4ba0219433d8f17e` |
-| [v1/logs-record.schema.json](v1/logs-record.schema.json) | each line of `logs.jsonl` | `docs/schemas/incident-bundle/v1/logs-record.schema.json` | `17fbf3ada612eff2c58b0105d76e22fc6afaca097fdbae9d8b7577ed9b03e994` |
+| [v1/logs-record.schema.json](v1/logs-record.schema.json)       | each line of `logs.jsonl`    | `docs/schemas/incident-bundle/v1/logs-record.schema.json`    | `17fbf3ada612eff2c58b0105d76e22fc6afaca097fdbae9d8b7577ed9b03e994` |
 
 The set is complete and self-contained: every file is JSON Schema draft 2020-12, and no file references another (`$ref` does not occur). Each `$id` (`https://commerce-platform.local/schemas/incident-bundle/v1/...`) is an identifier only; nothing is fetched from it.
 
@@ -45,7 +45,7 @@ JSON Schema covers each document and line. A conforming consumer also applies th
 8. **Truncation flag:** for each `manifest.capture.traces.services[i]`, `truncated` is true exactly when `truncationReasons` is not empty.
 9. **File integrity:** for each of `ground_truth.json`, `traces.jsonl`, `metrics.jsonl` and `logs.jsonl`, `manifest.files.<name>` gives `sha256` (64 lowercase hex characters of the file's bytes), `bytes` (its size) and `records` (1 for `ground_truth.json`, the line count for a JSONL file), and all three must match. The manifest does not describe itself.
 
-Report each failure with the file, and the field or line where there is one.
+Report each failure with the file, and the field or line where there is one. This repository implements these rules in `src/intake/` ([docs/intake.md](../../intake.md)).
 
 ## Semantics
 

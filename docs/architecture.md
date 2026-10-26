@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **intended design, not yet implemented.** Statements marked _decided_ come from accepted decision records; everything else is a proposal or an open question, listed at the end.
+Status: **intended design; bundle intake is implemented (E1).** Statements marked _decided_ come from accepted decision records. This repository's own decisions are its accepted ADRs ([index](adr/README.md)); everything else is an open question, listed at the end.
 
 ## Goal
 
@@ -30,31 +30,39 @@ The purpose comes from Commerce Platform's decision records: the bundles exist s
 
 These are responsibilities, not modules; no code or technology is chosen.
 
-1. **Bundle intake.** Read a bundle directory; check the five files, `schemaVersion`'s major version, each document and JSONL line against the [vendored schemas](contracts/incident-bundle/README.md), and the cross-file rules the schemas cannot express (checksums, counts, ID agreement). Reject invalid or unsupported bundles with the file and field at fault. Surface `capture.traces` truncation, so later steps know when evidence is incomplete.
+1. **Bundle intake** (implemented: [docs/intake.md](intake.md), [ADR 0005](adr/0005-bundle-intake-and-validation.md)). Read a bundle directory; check the five files, `schemaVersion`'s major version, each document and JSONL line against the [vendored schemas](contracts/incident-bundle/README.md), and the cross-file rules the schemas cannot express (checksums, counts, ID agreement). Reject invalid or unsupported bundles with the file and field at fault. Surface `capture.traces` truncation, so later steps know when evidence is incomplete.
 2. **Investigation.** From `manifest.json` and the three telemetry files, produce a diagnosis: the suspected root-cause component, the affected components, the evidence that supports each claim (citations to specific metric series, log records and traces), and recommended remediation steps.
 3. **Evaluation.** Compare a diagnosis with `ground_truth.json`: `rootCause.component`, `affectedComponents`, the `primarySymptom` condition, and `expectedRemediation`. Ground truth is a stable answer key: byte-identical for the same scenario, scenario version, seed and schema version.
 4. **Investigation UI** (after the backend): investigations, evidence, citations, recommendations, approval workflows and evaluation results, per ADR 0004.
 
-## Principles (proposed)
+## Principles
 
-- **Ground truth stays out of the investigation.** The investigation reads `manifest.json` and the telemetry files only; `ground_truth.json` is read by evaluation alone. Otherwise the score measures nothing. To decide (see below).
-- **Telemetry is data, not instructions.** Log messages, span attributes and labels come from the observed system and are untrusted input to any model or tool.
-- **Recommend, don't act.** Remediation is advice, with any action behind an approval workflow; this project has no channel to change Commerce Platform.
-- **Cite evidence.** Every conclusion points to the bundle records that support it.
+- **Ground truth stays out of the investigation** ([ADR 0003](adr/0003-ground-truth-isolation.md)). The investigation reads a blinded manifest and the telemetry files only; `ground_truth.json` is read by contract validation, which reports issues only, and by evaluation. Otherwise the score measures nothing.
+- **Telemetry is data, not instructions** ([ADR 0002](adr/0002-ai-provider-and-external-api-policy.md)). Log messages, span attributes and labels come from the observed system and are untrusted input to any model or tool.
+- **Recommend, don't act** ([ADR 0004](adr/0004-investigation-result-contract.md)). Remediation is advice, with any action behind an approval workflow; this project has no channel to change Commerce Platform.
+- **Cite evidence** ([ADR 0004](adr/0004-investigation-result-contract.md)). Every conclusion points to the bundle records that support it.
+
+## Decisions and open questions
+
+Accepted in this repository's ADRs (2026-10-26):
+
+| Topic                          | Proposal                                                                                                                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language and runtime           | TypeScript on Node.js 24, pnpm, Ajv for JSON Schema ([ADR 0001](adr/0001-runtime-and-language.md))                                                                                 |
+| AI provider and external calls | Provider-neutral model port; external calls only when explicitly configured, never in tests or CI, with hard budgets ([ADR 0002](adr/0002-ai-provider-and-external-api-policy.md)) |
+| Ground-truth isolation         | Two read paths; blinded evidence view; enforced by tests ([ADR 0003](adr/0003-ground-truth-isolation.md))                                                                          |
+| Investigation result format    | Versioned JSON with findings, confidence, and line-level evidence references ([ADR 0004](adr/0004-investigation-result-contract.md))                                               |
+| Bundle input and validation    | Local directories, read-only; schemas by major version, pinned by checksum ([ADR 0005](adr/0005-bundle-intake-and-validation.md))                                                  |
 
 ## Open decisions
 
-None of these is decided by any source document. Each needs the owner's decision, ideally as an ADR in [docs/adr/](adr/README.md).
+Still open, with the milestone that needs them:
 
-| Topic | Open question |
-| --- | --- |
-| Language and runtime | Not specified anywhere. |
-| AI model and provider | Which model, hosted or local, and whether external API calls are allowed. Commerce Platform's "no LLM calls" rule ([ADR 0001](adr/commerce-platform/0001-local-first-architecture.md)) binds only that repository. |
-| Local-first | Whether this project, like Commerce Platform, must run fully locally without accounts or credentials. |
-| Ground-truth isolation | Whether the investigation may ever read `ground_truth.json` (proposed: no). |
-| Diagnosis format | The structure of an investigation's output and its citations. |
-| Scoring | How a diagnosis is scored against ground truth, per field. |
-| Bundle input | Where bundles are read from, and whether this repository stores any (Commerce Platform keeps them out of Git, except a reviewed sample). |
-| JSON Schema validator | Which validator, once a language is chosen; the schemas are draft 2020-12. |
-| Investigation UI stack | Not specified; decided when the UI milestone starts. |
-| Project order | ADR 0008 is still proposed in Commerce Platform. |
+| Topic                         | Open question                                                                                                                                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| AI model and provider (E2)    | Which model, hosted or local; ADR 0002 sets the policy, not the choice.                                                                                                                                            |
+| Local-first (E2)              | Whether this project, like Commerce Platform, must run fully locally without accounts or credentials.                                                                                                              |
+| Fault-timing leakage (E2, E3) | The view hides `trigger`, `detection` and `window`, but the producer always faults 30 s after load start, which telemetry reveals. Randomising that is Commerce Platform's decision (ADR 0003, "Remaining risks"). |
+| Scoring (E3)                  | How a diagnosis is scored against ground truth, per field.                                                                                                                                                         |
+| Investigation UI stack (E4)   | Not specified; decided when the UI milestone starts.                                                                                                                                                               |
+| Project order                 | Commerce Platform's ADR 0008 is still proposed.                                                                                                                                                                    |

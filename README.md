@@ -6,7 +6,15 @@ Its first evidence source is [Commerce Platform](https://github.com/waquino814/c
 
 ## Status
 
-**Foundation only.** This repository holds the project's documentation and the incident-bundle contract it consumes. There is no application code yet, and no technology has been chosen. The next step is the first milestone in [docs/roadmap.md](docs/roadmap.md).
+**E1 in progress.** The first component, **bundle intake**, is implemented and tested: it validates incident bundles against the vendored contract (all nine rules) and opens a blinded evidence view that never reads the ground truth. See [docs/intake.md](docs/intake.md). Its architecture decisions, [ADRs 0001 to 0005](docs/adr/README.md), were **accepted** by the owner on 2026-10-26. There is no investigation, evaluation or UI code yet.
+
+TypeScript on Node.js 24, with pnpm ([ADR 0001](docs/adr/0001-runtime-and-language.md)):
+
+```sh
+pnpm install
+pnpm check                              # format, lint, typecheck, tests with coverage
+pnpm validate-bundle <bundle-dir>       # validate a bundle; exit 0 valid, 1 invalid
+```
 
 ## Boundaries
 
@@ -16,13 +24,14 @@ Its first evidence source is [Commerce Platform](https://github.com/waquino814/c
 
 ## Documentation
 
-| Document                                                             | Content                                                                    |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| [docs/architecture.md](docs/architecture.md)                         | Intended system, its boundary with Commerce Platform, and open decisions    |
-| [docs/roadmap.md](docs/roadmap.md)                                   | Milestones: the investigation backend first, the investigation UI after     |
-| [docs/contracts/incident-bundle/](docs/contracts/incident-bundle/README.md) | The incident-bundle v1 contract: JSON Schema files and a consumer guide |
-| [docs/examples/](docs/examples/README.md)                            | A genuine excerpt of a validated Commerce Platform bundle                   |
-| [docs/adr/](docs/adr/README.md)                                      | Decision records, including those transferred from Commerce Platform        |
+| Document                                                                    | Content                                                                  |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [docs/architecture.md](docs/architecture.md)                                | Intended system, its boundary with Commerce Platform, and open decisions |
+| [docs/intake.md](docs/intake.md)                                            | The bundle intake module: interface, rules, commands, limitations        |
+| [docs/roadmap.md](docs/roadmap.md)                                          | Milestones: the investigation backend first, the investigation UI after  |
+| [docs/contracts/incident-bundle/](docs/contracts/incident-bundle/README.md) | The incident-bundle v1 contract: JSON Schema files and a consumer guide  |
+| [docs/examples/](docs/examples/README.md)                                   | A genuine excerpt of a validated Commerce Platform bundle                |
+| [docs/adr/](docs/adr/README.md)                                             | Decision records, including those transferred from Commerce Platform     |
 
 ## Getting incident bundles
 
