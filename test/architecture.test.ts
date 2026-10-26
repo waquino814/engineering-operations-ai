@@ -11,7 +11,8 @@ const root = new URL('../src/', import.meta.url).pathname;
 async function sources(dir = ''): Promise<{ file: string; text: string }[]> {
   return Promise.all(
     (await readdir(join(root, dir), { recursive: true }))
-      .filter((f) => f.endsWith('.ts'))
+      // .tsx included: the console (ADR 0011) is held to the same rules.
+      .filter((f) => /\.tsx?$/.test(f))
       .map(async (f) => ({ file: join(dir, f), text: await readFile(join(root, dir, f), 'utf8') })),
   );
 }
@@ -62,6 +63,7 @@ describe('module boundaries', () => {
       'evaluation/ground-truth.ts',
       'evaluation/leakage.ts',
       'evaluation/synthetic.ts',
+      'evaluation/ui-fixtures.ts',
       'intake/checks.ts',
       'intake/contract.ts',
       'intake/validate-bundle.ts',
@@ -137,6 +139,41 @@ describe('module boundaries', () => {
     const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
       dependencies: Record<string, string>;
     };
-    expect(Object.keys(pkg.dependencies).sort()).toEqual(['ajv', 'ajv-formats']);
+    // ADR 0011 adds exactly React for the console; nothing else runs in production.
+    expect(Object.keys(pkg.dependencies).sort()).toEqual([
+      'ajv',
+      'ajv-formats',
+      'react',
+      'react-dom',
+    ]);
+  });
+
+  it('keeps the console to the browser, the result contract and its own data interface', async () => {
+    // Runtime imports only; `import type` is erased and may name any module's types.
+    const runtime = (text: string) =>
+      [
+        ...text.matchAll(/^import (?!type\b)[^;]*?from '([^']+)'/gm),
+        ...text.matchAll(/^import '([^']+)'/gm),
+        ...text.matchAll(/^export (?!type\b)[^;]*?from '([^']+)'/gm),
+        ...text.matchAll(/\bimport\(\s*['"`]([^'"`]+)['"`]/g),
+      ].map((m) => m[1] ?? '');
+    const allowedOutside = /^(\.\.\/)+investigation\/(result|config|schemas)\.ts$/;
+    const files = await sources('ui');
+    expect(files.length).toBeGreaterThan(10);
+    for (const { file, text } of files) {
+      for (const spec of runtime(text)) {
+        const external = !spec.startsWith('.');
+        const inside =
+          spec.startsWith('./') ||
+          /^\.\.\/(?!\.\.\/)(?!investigation|intake|pipeline|evaluation)/.test(spec);
+        expect(
+          external ? /^react(-dom\/client)?$/.test(spec) : inside || allowedOutside.test(spec),
+          `ui/${file} imports ${spec}`,
+        ).toBe(true);
+      }
+      expect(text, file).not.toMatch(
+        /node:|process\.|\bfetch\(|XMLHttpRequest|ground_truth|GROUND_TRUTH/,
+      );
+    }
   });
 });

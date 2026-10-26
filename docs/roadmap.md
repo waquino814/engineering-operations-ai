@@ -1,6 +1,25 @@
 # Roadmap
 
-Status: **proposed.** The order, backend first and investigation UI after, comes from Commerce Platform's project order ([ADR 0008](adr/commerce-platform/0008-project-order.md), proposed, agreed in principle by the owner on 2026-10-25). The milestones below are this repository's first proposal; each needs the owner's approval before it starts, and none fixes a technology.
+Status: **proposed**, with one owner decision. The portfolio order, this backend first and its investigation UI after, comes from Commerce Platform's project order ([ADR 0008](adr/commerce-platform/0008-project-order.md), proposed, agreed in principle by the owner on 2026-10-25). Each milestone needs the owner's approval before it starts, and none fixes a technology by itself; technology choices are ADRs.
+
+## Milestone order
+
+**Owner decision (2026-10-26): build the investigation UI before integrating a real AI provider.** Milestone IDs are stable: completed and in-progress records keep their numbers, and the scope still open in E2 and E3 moves to new milestones E5 to E7.
+
+| Order | Milestone                                                | Status                                                                          | Depends on                                                                                  |
+| ----: | -------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+|     1 | E0 Foundation, E1 intake                                 | complete                                                                        | —                                                                                           |
+|     1 | E2 investigation backend, E3 evaluation: the foundations | foundations delivered (`a65e5b9`); not complete; remaining scope moved to E5–E7 | E1                                                                                          |
+|     2 | **E4 Investigation UI** (current)                        | in progress: implemented; complete when its pushed commit passes CI on GitHub   | E2/E3 foundations and the result contract; **no** provider, credentials or external AI call |
+|     3 | E5 Provider integration                                  | not started                                                                     | owner approval of ADR 0008 after its verification; credentials and a spending budget        |
+|     4 | E6 End-to-end integration                                | not started                                                                     | E4, E5, and an ADR for the application/API boundary                                         |
+|     5 | E7 Evaluation and hardening                              | not started                                                                     | E6; varied-timing bundles from Commerce Platform for full coverage                          |
+
+Why this order is consistent with the decisions in force:
+
+- Commerce Platform [ADR 0004](adr/commerce-platform/0004-frontend-sequencing.md) (accepted upstream) builds this UI "after that repository's backend and investigation workflow are functional". The workflow is functional end to end with the deterministic fake provider ([ADR 0006](adr/0006-investigation-pipeline-and-limits.md)), and it produces every result state the UI must show; the provider changes where results come from, not their contract.
+- [ADR 0002](adr/0002-ai-provider-and-external-api-policy.md) keeps tests and CI free of credentials and external calls; E4 needs neither.
+- The result contract the UI renders is accepted ADR 0004 as amended by [ADR 0010](adr/0010-investigation-result-contract-v0.md), accepted on 2026-10-26.
 
 ## Where this project sits
 
@@ -14,7 +33,9 @@ Commerce Platform's portfolio order:
 
 **Upstream status on 2026-10-26** (Commerce Platform `docs/roadmap.md`): M5 is still open. All five scenarios have produced valid bundles, and its reproducibility reruns are in progress. M6, which adds a reviewed sample bundle to Commerce Platform, has not started. Bundle schema v1 is accepted and is not affected by either.
 
-## E0: Foundation (this change)
+## E0: Foundation
+
+**Status: complete.**
 
 - README, architecture and roadmap describe the project and its boundary.
 - The incident-bundle v1 contract is vendored with provenance, and the consumer rules beyond JSON Schema are written down.
@@ -41,7 +62,7 @@ Original scope:
 
 ## E2: Investigation backend
 
-**Status: in progress. The foundation is implemented, uncommitted, for review; E2 is not complete.**
+**Status: foundation delivered in commit `a65e5b9`; E2 is not complete.** On 2026-10-26 its provider-dependent scope moved to E5 (provider integration) and E7 (diagnostic quality); its checklist below is kept as the record.
 
 Original scope:
 
@@ -64,18 +85,19 @@ Completed (foundation):
 
 In progress or blocked:
 
-- [ ] **Owner review** of proposed ADRs 0006 to 0008 and 0010. **Blocking before commit:** ADR 0010's change to accepted ADR 0004 (`failure` on `inconclusive`).
+- [ ] **Owner review** of proposed ADRs 0006 to 0008.
+- [x] ADR 0010 and its amendment to ADR 0004 (no `failure` on `inconclusive`), accepted by the owner on 2026-10-26.
 - [ ] **Blocked on the owner's decision:** a real provider adapter. [ADR 0008](adr/0008-model-provider-recommendation.md) recommends one; implementing it needs approval, a credential, and an agreed budget.
 - [ ] Token budget in production: needs an adapter that maps its provider's usage fields and confirms `maxInputTokensPerCall` against the provider's tokenizer ([ADR 0008](adr/0008-model-provider-recommendation.md), "Verification required before approval").
 - [ ] Verification of ADR 0008's provider facts against current official documentation.
 - [ ] A real bundle investigated by a real model, with a verified result.
 - [ ] Semantic support of findings: whether cited evidence supports the statement is not assessed.
 
-Done when a real Commerce Platform bundle produces a schema-valid, reference-verified result from an approved provider, within its limits, and the ADRs are accepted.
+Done when a real Commerce Platform bundle produces a schema-valid, reference-verified result from an approved provider, within its limits, and the ADRs are accepted. After the reorder, that criterion is met by E5 (adapter) and E6 (end to end); owner review of ADRs 0006, 0007 and 0010 stays here.
 
 ## E3: Evaluation
 
-**Status: in progress. The harness is implemented with synthetic cases only; E3 is not complete.**
+**Status: harness delivered in commit `a65e5b9`, synthetic cases only; E3 is not complete.** On 2026-10-26 its real-model scope moved to E7; its checklist below is kept as the record.
 
 Original scope:
 
@@ -101,5 +123,87 @@ Done when real bundles, including held-out seeds and at least one held-out scena
 
 ## E4: Investigation UI
 
-- Decide the UI stack.
-- Show investigations, evidence, citations, recommendations, approval workflows and evaluation results (Commerce Platform [ADR 0004](adr/commerce-platform/0004-frontend-sequencing.md)).
+**Status: in progress (2026-10-26). Implemented, with ADR 0011 accepted; not complete until the commit that delivers it passes GitHub Actions.** Next milestone by the owner's decision of 2026-10-26.
+
+Progress against the acceptance criteria below:
+
+- [x] 1. UI stack ADR accepted: [ADR 0011](adr/0011-investigation-ui-stack.md), accepted by the owner on 2026-10-26.
+- [x] 2. Every screen and state renders contract-valid fixtures: the overview, new investigation (four fixture bundles, two invalid) and detail views; eight fixture investigations covering completed, repaired, inconclusive, evidence-verification failure, provider failure, budget exceeded and not admitted.
+- [ ] 3. Tests pass in CI on GitHub: they pass locally under `pnpm check`; the GitHub Actions run of the commit that delivers E4 decides this criterion.
+- [x] 4. Coverage thresholds met for the console's source (per file, 90% lines, 80% branches), unchanged elsewhere.
+- [x] 5. `pnpm eval:synthetic` matches the golden report byte for byte; investigation and evaluation tests unchanged.
+- [x] 6. No provider dependency, credential or external call.
+
+Also delivered: ADR 0010 accepted, with its amendment recorded in ADR 0004; guard tests extended to `.tsx`, which they had not been reading.
+
+An operator-facing investigation console, inside this repository, built on deterministic fixtures and the existing investigation-result contract.
+
+**Scope:**
+
+- **Investigations overview:** run history with outcome status (`completed`, `inconclusive`, `budget_exceeded`, `failed`, and not admitted), case, provider and model, finding counts, and start time.
+- **New investigation:** select or upload a bundle, show its validation result (valid, or the issues by rule, file and field), and start an investigation only when validation succeeds.
+- **Investigation detail workspace:** summary and outcome; affected components; findings with kind, confidence, rationale and statement; evidence references (file, line, quoted identifiers); each finding's verification statements, with `semanticSupport: not_assessed` shown as such, never as verified; limitations; diagnostics (selection summary, failure class and message, limits).
+- **Run details:** model calls, retries, repairs, reported and charged tokens against `maxTotalTokens`, and whether accounting is `reported` or `estimated`.
+- **States:** loading, empty, validation error, failure, inconclusive and budget exceeded, each designed and tested.
+- Out of scope for E4: approval workflows and evaluation-result views, named by Commerce Platform ADR 0004 for this UI; they are planned after E6.
+
+**Design direction:** a dark enterprise incident-management and observability console. Charcoal and slate surfaces with restrained blue accents; a left navigation sidebar and a compact top bar; information-dense layouts for engineers and incident responders; evidence panels, diagnostic details, timelines, compact tables and clear status indicators. No storefront styling, oversized cards, decorative stock images or chat-style layout. Status colours never carry meaning alone: each status also has text, and contrast meets WCAG AA.
+
+**Constraints:**
+
+- **Stack first.** The UI stack is still an open decision ([architecture](architecture.md#open-decisions)). E4 starts with a proposed ADR choosing it, within [ADR 0001](adr/0001-runtime-and-language.md) (TypeScript), with the owner's approval. Commerce Platform ADR 0004's context expects React; that is an input, not a decision here.
+- **One application, in this repository.** There is no existing frontend code here to reuse (checked 2026-10-26). Commerce Platform's own UI is in another repository and is never imported.
+- **The contract is the source of truth.** Types and states come from the result contract ([docs/contracts/investigation-result/](contracts/investigation-result/README.md)); the UI reads results through `readInvestigationResult` or the published schema and handles every state the contract defines, and no others.
+- **Deterministic fixtures, produced by the real code.** Result fixtures are generated by the pipeline with `FakeProvider` (as the synthetic evaluation does), covering every state; validation fixtures are real `validateBundle` reports on fixture bundles. A test fails if a fixture stops passing the contract. Fixtures never include ground truth or evaluation scores.
+- **No invented API.** There is no application or HTTP boundary today: the pipeline is a library called with a bundle path. In E4 the UI reads fixtures through a typed data-source interface whose shape follows the contract. Upload, live validation, starting runs and run history need that boundary and persistence, which E6 decides; E4 records what the UI needs from it.
+- **No provider, no credentials.** E4 adds no provider SDK, key or external AI call; `pnpm check` and CI stay credential-free.
+- **Tests in the same change, in CI.** Every UI feature ships with automated tests that run under `pnpm check`, which CI already runs. Coverage thresholds (90% lines, 80% branches, per file) extend to the UI's source; they are not lowered. The architecture tests' dependency allowlist and no-network rule are changed only deliberately, by the UI stack ADR, and keep the investigator's isolation rules intact.
+- **Nothing else changes.** Investigation and evaluation behaviour, the golden evaluation report and the leak checks stay as they are unless a documented decision requires a change. Nothing in `commerce-platform` is modified.
+
+**Dependencies:**
+
+- No dependency on E5: provider integration is **not** a prerequisite for the UI, and UI work needs no credentials or external AI calls.
+- ~~Proposed ADR 0010~~: accepted 2026-10-26; an `inconclusive` result carries no `failure`, and the UI shows it as a valid investigation with its limitations.
+- **Bundle upload** goes beyond [ADR 0005](adr/0005-bundle-intake-and-validation.md)'s local, read-only directories ("no network intake, upload or database in E1"). E4 may design the upload step against fixtures; accepting real uploads needs an ADR 0005 amendment, in E6.
+
+**Acceptance criteria:**
+
+1. The UI stack ADR is accepted by the owner.
+2. Every screen and state above exists and renders contract-valid fixtures, including one per result state and a validation-error fixture.
+3. Automated tests cover each view and state, and the fixture contract check; they run under `pnpm check` and **pass in CI on GitHub** (a local run is not enough to close the milestone).
+4. Coverage thresholds are met for the UI's source, unchanged elsewhere.
+5. `pnpm eval:synthetic` still matches the golden report byte for byte, and the investigation and evaluation tests are unchanged.
+6. No provider dependency, credential or external call exists.
+
+## E5: Provider integration
+
+**Status: not started.** After E4. Carries forward E2's provider scope.
+
+- Verify ADR 0008's facts against the provider's current official documentation ([ADR 0008](adr/0008-model-provider-recommendation.md), "Verification required before approval"), then the owner approves, revises or rejects ADR 0008.
+- Finalize provider-specific token accounting and configuration: map the provider's usage fields (including cached input) into `UsageReport`; decide when an error may report zero usage; confirm `maxInputTokensPerCall` with the provider's token counting ([ADR 0006](adr/0006-investigation-pipeline-and-limits.md)).
+- Implement the adapter behind `ModelProvider`, with its error and usage mapping unit-tested without network; credentials only from the environment (ADR 0002).
+- A controlled, operator-run evaluation on real bundles, **only after the owner explicitly approves credentials and a spending budget**.
+
+Done when the adapter passes its tests, the controlled evaluation has run within its approved budget, and ADR 0008 is accepted.
+
+## E6: End-to-end integration
+
+**Status: not started.** After E4 and E5.
+
+- Decide, as an ADR, the application/API boundary between the UI and the pipeline: how runs are started, how bundles enter (amending ADR 0005 if uploads are accepted), where results and run history are stored, and how errors reach the UI. The boundary keeps ADR 0003's isolation: no path, validation report or answer key reaches the investigator.
+- Implement it with tests, and connect the UI to it in place of fixtures.
+- **Live end-to-end investigation requires this boundary and the E5 adapter**; until both exist, the UI shows fixtures only.
+
+Done when an operator can validate a real bundle, start an investigation with the approved provider, and see the result in the UI, with tests for the boundary passing in CI.
+
+## E7: Evaluation and hardening
+
+**Status: not started.** After E6. Carries forward E3's real-model scope.
+
+- Diagnostic quality: score real diagnoses per scenario, with held-out seeds and at least one held-out scenario ([ADR 0009](adr/0009-evaluation-harness-and-scoring.md)); symptom and remediation scoring; whether evidence semantically supports findings.
+- Security boundaries: re-run the leak checks and isolation tests against the live path; review the API boundary.
+- Reliability, observability and operational behaviour: provider failures, budgets and timeouts in live runs; logging and metrics that carry no telemetry content or credentials.
+- Approval workflows and evaluation-result views in the UI (Commerce Platform ADR 0004).
+- Depends on Commerce Platform for bundles with varied fault timing (ADR 0003, "Remaining risks").
+
+Done when real-model results are scored repeatably with a per-scenario report, and the hardening items have tests in CI.

@@ -1,6 +1,6 @@
 # Investigation result contract
 
-The JSON documents this project produces, and the one it asks a model to produce. Version **0.1.0** of each; the design is [ADR 0004](../../adr/0004-investigation-result-contract.md) (accepted) with the amendment and compatibility policy in [ADR 0010](../../adr/0010-investigation-result-contract-v0.md) (**proposed**).
+The JSON documents this project produces, and the one it asks a model to produce. Version **0.1.0** of each; the design is [ADR 0004](../../adr/0004-investigation-result-contract.md) (accepted) with the amendment and compatibility policy in [ADR 0010](../../adr/0010-investigation-result-contract-v0.md) (accepted 2026-10-26).
 
 | File                                                                       | Content                                                              |
 | -------------------------------------------------------------------------- | -------------------------------------------------------------------- |

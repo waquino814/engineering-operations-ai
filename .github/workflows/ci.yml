@@ -1,5 +1,6 @@
 # Runs the repository's quality gates (`pnpm check`: format, lint, typecheck, tests with
-# coverage) on every pull request to main, every push to main, and on demand. It needs nothing
+# coverage, including the investigation console's tests, and the console's production build) on
+# every pull request to main, every push to main, and on demand. It needs nothing
 # but this repository: no other checkout, service, secret or AI provider (ADRs 0001 and 0002).
 name: CI
 

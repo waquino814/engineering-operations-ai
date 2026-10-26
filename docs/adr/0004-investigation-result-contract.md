@@ -2,6 +2,7 @@
 
 - **Status:** Accepted (2026-10-26), approved by the repository owner after the E1 review, as the initial direction. It defines the shape E2 must produce; nothing in E1 produces results, and the format stays at version 0.1.0 until E2 stabilises it.
 - **Date:** 2026-10-26
+- **Amended:** 2026-10-26 by [ADR 0010](0010-investigation-result-contract-v0.md) (accepted); see "Amendment" at the end. The text above it is the original decision, unchanged.
 
 ## Context
 
@@ -51,3 +52,11 @@ The result is one JSON document, `investigation-result.json`, version `0.1.0` un
 - **Positive:** evaluation and the UI can check every claim against the source bytes. Fabricated evidence is detectable mechanically.
 - **Negative:** line numbers tie a reference to one exact file; a re-captured bundle needs a new investigation. That is intended.
 - **Open:** whether findings also state the symptom as a structured condition comparable with `primarySymptom`, which would make scoring easier but tempt overfitting to the ground-truth format. To decide in E3.
+
+## Amendment (2026-10-26, ADR 0010)
+
+Accepted by the repository owner on 2026-10-26. Where it differs from the text above, this amendment governs; the full reasoning, the result states and the compatibility policy are in [ADR 0010](0010-investigation-result-contract-v0.md).
+
+- **`failure` is present only when `outcome` is `failed` or `budget_exceeded`.** An `inconclusive` result carries no `failure`: it is a valid investigation that states in `limitations` why the evidence does not support a conclusion. This replaces "present unless `completed`" in the field table, which contradicted this ADR's own rule that `inconclusive` is a valid, expected outcome.
+- Additive, as ADR 0010 lists: each finding's `verification` statements, the `selection` summary, token accounting in `run.usage`, and `caseId` and `bundle` as `null` when a bundle or configuration is refused before any investigation.
+- The result stays at version `0.1.0`, with the versioning policy in ADR 0010.

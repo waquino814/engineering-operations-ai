@@ -2,7 +2,7 @@
 
 - **Status:** Proposed (2026-10-26). Implemented in the E2 foundation for review; not approved by the repository owner. Reviewed and revised on 2026-10-26 (token budget, stricter boundary tests); see "Review".
 - **Date:** 2026-10-26
-- **Depends on (accepted):** [0001](0001-runtime-and-language.md) (TypeScript, Ajv), [0002](0002-ai-provider-and-external-api-policy.md) (provider-neutral port, hard budgets, transient-only retries), [0003](0003-ground-truth-isolation.md) (two read paths, blinded view), [0004](0004-investigation-result-contract.md) (result shape), [0005](0005-bundle-intake-and-validation.md) (intake). Proposed companions: [0007](0007-evidence-grounding-and-output-validation.md), [0010](0010-investigation-result-contract-v0.md).
+- **Depends on (accepted):** [0001](0001-runtime-and-language.md) (TypeScript, Ajv), [0002](0002-ai-provider-and-external-api-policy.md) (provider-neutral port, hard budgets, transient-only retries), [0003](0003-ground-truth-isolation.md) (two read paths, blinded view), [0004](0004-investigation-result-contract.md) (result shape), [0005](0005-bundle-intake-and-validation.md) (intake). Proposed companions: [0007](0007-evidence-grounding-and-output-validation.md). Accepted since: [0010](0010-investigation-result-contract-v0.md) (2026-10-26).
 
 ## Context
 

@@ -1,6 +1,7 @@
 # 0010: Investigation result contract v0: states, compatibility and amendment to ADR 0004
 
-- **Status:** Proposed (2026-10-26). Not approved by the repository owner. Until it is, the code deviates from the accepted [ADR 0004](0004-investigation-result-contract.md) on the points listed under "Amendment", and that deviation must be resolved before the E2 work is committed.
+- **Status:** Accepted (2026-10-26), approved by the repository owner at the start of E4, including its amendment to [ADR 0004](0004-investigation-result-contract.md): an `inconclusive` result carries no `failure`. ADR 0004 records the amendment; its original text is unchanged.
+- **History:** proposed 2026-10-26 with the E2 foundation (commit `a65e5b9`), when the code already followed it; accepted 2026-10-26.
 - **Date:** 2026-10-26
 
 ## Context
@@ -29,7 +30,7 @@ A consumer distinguishes the three cases the brief names:
 
 Other rules beyond the schema: finding IDs are unique; remediation addresses only existing findings; `repairAttempts + retries ≤ modelCalls`; `chargedTokens ≥ inputTokens + outputTokens`; `tokenAccounting` is `reported` exactly when no call was unreported or inconsistent.
 
-### Amendment to ADR 0004 (proposed)
+### Amendment to ADR 0004 (accepted 2026-10-26)
 
 1. **`failure` only on `failed` and `budget_exceeded`.** ADR 0004 requires it on `inconclusive` too. The amendment treats inconclusive as a successful investigation with a negative conclusion, consistent with ADR 0004's own rule that it is "valid, expected". The alternative that keeps ADR 0004's wording is a new failure class such as `insufficient_evidence` on every inconclusive result; it was rejected because it makes "failed to execute" and "concluded nothing" look alike to consumers that branch on `failure`.
 2. **`verification` on every finding**, stating each deterministic check separately and `semanticSupport: "not_assessed"` ([ADR 0007](0007-evidence-grounding-and-output-validation.md)). Additive.
@@ -52,10 +53,10 @@ Other rules beyond the schema: finding IDs are unique; remediation addresses onl
 - **Positive:** a consumer can tell success, a negative conclusion and a failure apart from two fields, and malformed combinations are rejected mechanically. Tests cover every state and twenty-plus malformed combinations.
 - **Positive:** the result cannot claim more verification than the code performs.
 - **Negative:** strict 0.x versioning means every schema change breaks old consumers until 1.0; acceptable while the only consumers are in this repository.
-- **Open (owner):** approve change 1, or direct the code back to ADR 0004's wording with a failure class for inconclusive results.
+- **Decided (owner, 2026-10-26):** change 1 is approved; the alternative, a failure class for inconclusive results, is not adopted.
 
 ## Acceptance criteria
 
-1. The owner approves or rejects change 1, and ADR 0004 is amended (or the code changed) accordingly.
+1. ~~The owner approves or rejects change 1~~: approved 2026-10-26, and ADR 0004 records the amendment.
 2. `pnpm check` passes with the result-state tests (`test/investigation/result-contract.test.ts`), the schema drift test and the golden evaluation report.
 3. Every result the pipeline produces in tests and in the synthetic evaluation passes `readInvestigationResult` (`resultValid: true` in the report).

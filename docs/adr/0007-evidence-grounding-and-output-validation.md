@@ -2,7 +2,7 @@
 
 - **Status:** Proposed (2026-10-26). Implemented in the E2 foundation for review; not approved by the repository owner. Reviewed and revised on 2026-10-26; see "Review".
 - **Date:** 2026-10-26
-- **Depends on (accepted):** [0002](0002-ai-provider-and-external-api-policy.md) (telemetry is data, not instructions), [0003](0003-ground-truth-isolation.md) (the admitted view), [0004](0004-investigation-result-contract.md) (every finding cites evidence; a verifier rejects bad references). Proposed companions: [0006](0006-investigation-pipeline-and-limits.md), [0010](0010-investigation-result-contract-v0.md).
+- **Depends on (accepted):** [0002](0002-ai-provider-and-external-api-policy.md) (telemetry is data, not instructions), [0003](0003-ground-truth-isolation.md) (the admitted view), [0004](0004-investigation-result-contract.md) (every finding cites evidence; a verifier rejects bad references). Proposed companions: [0006](0006-investigation-pipeline-and-limits.md). Accepted since: [0010](0010-investigation-result-contract-v0.md) (2026-10-26).
 
 ## Context
 

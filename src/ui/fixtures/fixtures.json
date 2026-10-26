@@ -1,0 +1,1226 @@
+{
+  "fixtureVersion": 1,
+  "notice": "Fixture data. Generated from synthetic bundles by the real pipeline with a deterministic fake model provider. No live investigation ran and no real model was called.",
+  "bundles": [
+    {
+      "id": "bundle-a",
+      "label": "Fixture bundle A",
+      "description": "A genuine Commerce Platform bundle excerpt, with recomputed checksums.",
+      "origin": "fixture",
+      "validation": {
+        "valid": true,
+        "schemaVersion": "1.0.0",
+        "issues": [],
+        "metadata": {
+          "caseId": "ec2275bde9750840",
+          "manifest": {
+            "schemaVersion": "1.0.0",
+            "services": [
+              {
+                "name": "orders-api",
+                "version": "0.0.0",
+                "instanceId": "a528255144d3"
+              },
+              {
+                "name": "worker",
+                "version": "0.0.0",
+                "instanceId": "worker-1"
+              }
+            ],
+            "capture": {
+              "traces": {
+                "services": [
+                  {
+                    "name": "orders-api",
+                    "truncated": false,
+                    "truncationReasons": [],
+                    "saturatedSlices": 0
+                  },
+                  {
+                    "name": "worker",
+                    "truncated": false,
+                    "truncationReasons": [],
+                    "saturatedSlices": 0
+                  }
+                ]
+              },
+              "metrics": {
+                "stepSeconds": 5
+              },
+              "logs": {
+                "services": [
+                  {
+                    "name": "orders-api",
+                    "nonJsonLines": 0
+                  },
+                  {
+                    "name": "worker",
+                    "nonJsonLines": 0
+                  }
+                ]
+              }
+            },
+            "files": {
+              "traces.jsonl": {
+                "sha256": "86b1c76076390d90bd5378d9469be38d0ad11330d7228a2a6a3f7cf0e3a0b08b",
+                "bytes": 13365,
+                "records": 2
+              },
+              "metrics.jsonl": {
+                "sha256": "0d0844f38c244895384050504db0ae40169242a0e810116a6ecacf140e7292a6",
+                "bytes": 2166,
+                "records": 2
+              },
+              "logs.jsonl": {
+                "sha256": "747bc2acadd8a1e0364feeb0bb71fcffff2f44c3a5e1e0469c3f19892b6c88ce",
+                "bytes": 1338,
+                "records": 4
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "bundle-b",
+      "label": "Fixture bundle B",
+      "description": "An invented incident with invented components and telemetry.",
+      "origin": "fixture",
+      "validation": {
+        "valid": true,
+        "schemaVersion": "1.0.0",
+        "issues": [],
+        "metadata": {
+          "caseId": "b70b149f892fa3b9",
+          "manifest": {
+            "schemaVersion": "1.0.0",
+            "services": [
+              {
+                "name": "orders-api",
+                "version": "0.0.0",
+                "instanceId": "a528255144d3"
+              },
+              {
+                "name": "worker",
+                "version": "0.0.0",
+                "instanceId": "worker-1"
+              }
+            ],
+            "capture": {
+              "traces": {
+                "services": [
+                  {
+                    "name": "orders-api",
+                    "truncated": false,
+                    "truncationReasons": [],
+                    "saturatedSlices": 0
+                  },
+                  {
+                    "name": "worker",
+                    "truncated": false,
+                    "truncationReasons": [],
+                    "saturatedSlices": 0
+                  }
+                ]
+              },
+              "metrics": {
+                "stepSeconds": 5
+              },
+              "logs": {
+                "services": [
+                  {
+                    "name": "orders-api",
+                    "nonJsonLines": 0
+                  },
+                  {
+                    "name": "worker",
+                    "nonJsonLines": 0
+                  }
+                ]
+              }
+            },
+            "files": {
+              "traces.jsonl": {
+                "sha256": "79db3a07aa4c3cae7b8f824c94831cf58e38c0d36208d20c1e880458ea561470",
+                "bytes": 866,
+                "records": 2
+              },
+              "metrics.jsonl": {
+                "sha256": "9e2439c5fcb7d0f22296cf7ea9555ad8cd1e897e7887b34164763aefbbf2c966",
+                "bytes": 499,
+                "records": 3
+              },
+              "logs.jsonl": {
+                "sha256": "100a9b8c0b3c57d27d333950a63e6e50d08e915aa6f76a39c6fa3dad7c5a88e0",
+                "bytes": 777,
+                "records": 6
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "bundle-c",
+      "label": "Fixture bundle C",
+      "description": "Bundle A with its log file altered after the manifest was written.",
+      "origin": "fixture",
+      "validation": {
+        "valid": false,
+        "schemaVersion": "1.0.0",
+        "issues": [
+          {
+            "rule": 4,
+            "ruleId": "jsonl-records",
+            "file": "logs.jsonl",
+            "line": 1,
+            "message": "logs.jsonl line 1: malformed JSON"
+          },
+          {
+            "rule": 9,
+            "ruleId": "file-integrity",
+            "file": "logs.jsonl",
+            "field": "files.logs.jsonl.sha256",
+            "message": "manifest.json files.logs.jsonl.sha256 is \"747bc2acadd8a1e0364feeb0bb71fcffff2f44c3a5e1e0469c3f19892b6c88ce\", but logs.jsonl has \"92e78d0b032962f47792a9fa95fd981ef63e1e3ef074d536d6304c75eddbe29f\""
+          },
+          {
+            "rule": 9,
+            "ruleId": "file-integrity",
+            "file": "logs.jsonl",
+            "field": "files.logs.jsonl.bytes",
+            "message": "manifest.json files.logs.jsonl.bytes is 1338, but logs.jsonl has 9"
+          },
+          {
+            "rule": 9,
+            "ruleId": "file-integrity",
+            "file": "logs.jsonl",
+            "field": "files.logs.jsonl.records",
+            "message": "manifest.json files.logs.jsonl.records is 4, but logs.jsonl has 1"
+          }
+        ],
+        "metadata": null
+      }
+    },
+    {
+      "id": "bundle-d",
+      "label": "Fixture bundle D",
+      "description": "Bundle B declaring a contract major version this project does not support.",
+      "origin": "fixture",
+      "validation": {
+        "valid": false,
+        "schemaVersion": "2.0.0",
+        "issues": [
+          {
+            "rule": 2,
+            "ruleId": "supported-major-version",
+            "file": "manifest.json",
+            "field": "schemaVersion",
+            "message": "schemaVersion \"2.0.0\" has major version 2; supported: 1"
+          }
+        ],
+        "metadata": null
+      }
+    }
+  ],
+  "investigations": [
+    {
+      "id": "fx-001",
+      "bundleId": "bundle-a",
+      "label": "Scripted reply",
+      "result": {
+        "schemaVersion": "0.1.0",
+        "caseId": "ec2275bde9750840",
+        "bundle": {
+          "files": {
+            "traces.jsonl": {
+              "sha256": "86b1c76076390d90bd5378d9469be38d0ad11330d7228a2a6a3f7cf0e3a0b08b"
+            },
+            "metrics.jsonl": {
+              "sha256": "0d0844f38c244895384050504db0ae40169242a0e810116a6ecacf140e7292a6"
+            },
+            "logs.jsonl": {
+              "sha256": "747bc2acadd8a1e0364feeb0bb71fcffff2f44c3a5e1e0469c3f19892b6c88ce"
+            }
+          }
+        },
+        "outcome": "completed",
+        "findings": [
+          {
+            "id": "F1",
+            "kind": "root_cause",
+            "statement": "Payment provider lookups fail, so payments cannot be confirmed.",
+            "components": [
+              "payment-provider"
+            ],
+            "confidence": "medium",
+            "rationale": "Lookup errors rise in the payment-call counter and the worker logs failed lookups.",
+            "evidence": [
+              {
+                "file": "metrics.jsonl",
+                "line": 1,
+                "series": {
+                  "name": "commerce_payment_calls_total",
+                  "labels": {
+                    "instance": "worker-1",
+                    "job": "worker",
+                    "otel_scope_name": "@commerce/telemetry",
+                    "payment_operation": "lookup_or_void",
+                    "payment_replayed": "false",
+                    "payment_result": "error"
+                  }
+                }
+              },
+              {
+                "file": "logs.jsonl",
+                "line": 3,
+                "time": "2026-10-26T12:23:03.954Z",
+                "service": "worker"
+              }
+            ],
+            "verification": {
+              "referenceExists": "verified",
+              "identityMatches": "verified",
+              "integrity": "verified",
+              "includedInRequest": "verified",
+              "semanticSupport": "not_assessed"
+            }
+          },
+          {
+            "id": "F2",
+            "kind": "affected_component",
+            "statement": "The worker cannot finish payments.",
+            "components": [
+              "worker"
+            ],
+            "confidence": "medium",
+            "rationale": "A worker trace records a failed lookup.",
+            "evidence": [
+              {
+                "file": "traces.jsonl",
+                "line": 1,
+                "traceId": "1fc2e83d806c2db9abecaa681ad19c62"
+              }
+            ],
+            "verification": {
+              "referenceExists": "verified",
+              "identityMatches": "verified",
+              "integrity": "verified",
+              "includedInRequest": "verified",
+              "semanticSupport": "not_assessed"
+            }
+          }
+        ],
+        "remediation": [
+          {
+            "step": "Restore the payment provider, then recheck parked orders.",
+            "addresses": [
+              "F1",
+              "F2"
+            ]
+          }
+        ],
+        "limitations": [],
+        "selection": {
+          "limits": {
+            "maxRecords": 200,
+            "maxRecordBytes": 16384,
+            "maxBytes": 147542
+          },
+          "files": {
+            "traces.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "metrics.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "logs.jsonl": {
+              "records": 4,
+              "selected": 4,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            }
+          },
+          "selectedBytes": 16861,
+          "emptyFiles": [],
+          "truncatedTraceServices": [],
+          "notes": []
+        },
+        "run": {
+          "provider": "fake",
+          "model": "scripted",
+          "limits": {
+            "maxModelCalls": 4,
+            "maxRepairAttempts": 1,
+            "maxRetries": 2,
+            "retryBaseDelayMs": 1000,
+            "retryMaxDelayMs": 10000,
+            "perCallTimeoutMs": 60000,
+            "deadlineMs": 300000,
+            "maxOutputTokens": 4000,
+            "maxInputTokensPerCall": 200000,
+            "maxTotalTokens": 816000,
+            "maxContextBytes": 200000,
+            "maxEvidenceRecords": 200,
+            "maxRecordBytes": 16384
+          },
+          "usage": {
+            "modelCalls": 1,
+            "repairAttempts": 0,
+            "retries": 0,
+            "inputTokens": 6200,
+            "outputTokens": 410,
+            "chargedTokens": 6610,
+            "unreportedCalls": 0,
+            "inconsistentReports": 0,
+            "tokenAccounting": "reported"
+          },
+          "startedAt": "2026-10-26T09:00:00.250Z",
+          "finishedAt": "2026-10-26T09:00:00.750Z",
+          "durationMs": 500
+        }
+      }
+    },
+    {
+      "id": "fx-002",
+      "bundleId": "bundle-a",
+      "label": "Scripted invalid reply, then a repaired one",
+      "result": {
+        "schemaVersion": "0.1.0",
+        "caseId": "ec2275bde9750840",
+        "bundle": {
+          "files": {
+            "traces.jsonl": {
+              "sha256": "86b1c76076390d90bd5378d9469be38d0ad11330d7228a2a6a3f7cf0e3a0b08b"
+            },
+            "metrics.jsonl": {
+              "sha256": "0d0844f38c244895384050504db0ae40169242a0e810116a6ecacf140e7292a6"
+            },
+            "logs.jsonl": {
+              "sha256": "747bc2acadd8a1e0364feeb0bb71fcffff2f44c3a5e1e0469c3f19892b6c88ce"
+            }
+          }
+        },
+        "outcome": "completed",
+        "findings": [
+          {
+            "id": "F1",
+            "kind": "root_cause",
+            "statement": "Payment provider lookups fail, so payments cannot be confirmed.",
+            "components": [
+              "payment-provider"
+            ],
+            "confidence": "medium",
+            "rationale": "Lookup errors rise in the payment-call counter and the worker logs failed lookups.",
+            "evidence": [
+              {
+                "file": "metrics.jsonl",
+                "line": 1,
+                "series": {
+                  "name": "commerce_payment_calls_total",
+                  "labels": {
+                    "instance": "worker-1",
+                    "job": "worker",
+                    "otel_scope_name": "@commerce/telemetry",
+                    "payment_operation": "lookup_or_void",
+                    "payment_replayed": "false",
+                    "payment_result": "error"
+                  }
+                }
+              },
+              {
+                "file": "logs.jsonl",
+                "line": 3,
+                "time": "2026-10-26T12:23:03.954Z",
+                "service": "worker"
+              }
+            ],
+            "verification": {
+              "referenceExists": "verified",
+              "identityMatches": "verified",
+              "integrity": "verified",
+              "includedInRequest": "verified",
+              "semanticSupport": "not_assessed"
+            }
+          },
+          {
+            "id": "F2",
+            "kind": "affected_component",
+            "statement": "The worker cannot finish payments.",
+            "components": [
+              "worker"
+            ],
+            "confidence": "medium",
+            "rationale": "A worker trace records a failed lookup.",
+            "evidence": [
+              {
+                "file": "traces.jsonl",
+                "line": 1,
+                "traceId": "1fc2e83d806c2db9abecaa681ad19c62"
+              }
+            ],
+            "verification": {
+              "referenceExists": "verified",
+              "identityMatches": "verified",
+              "integrity": "verified",
+              "includedInRequest": "verified",
+              "semanticSupport": "not_assessed"
+            }
+          }
+        ],
+        "remediation": [
+          {
+            "step": "Restore the payment provider, then recheck parked orders.",
+            "addresses": [
+              "F1",
+              "F2"
+            ]
+          }
+        ],
+        "limitations": [],
+        "selection": {
+          "limits": {
+            "maxRecords": 200,
+            "maxRecordBytes": 16384,
+            "maxBytes": 147542
+          },
+          "files": {
+            "traces.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "metrics.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "logs.jsonl": {
+              "records": 4,
+              "selected": 4,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            }
+          },
+          "selectedBytes": 16861,
+          "emptyFiles": [],
+          "truncatedTraceServices": [],
+          "notes": []
+        },
+        "run": {
+          "provider": "fake",
+          "model": "scripted",
+          "limits": {
+            "maxModelCalls": 4,
+            "maxRepairAttempts": 1,
+            "maxRetries": 2,
+            "retryBaseDelayMs": 1000,
+            "retryMaxDelayMs": 10000,
+            "perCallTimeoutMs": 60000,
+            "deadlineMs": 300000,
+            "maxOutputTokens": 4000,
+            "maxInputTokensPerCall": 200000,
+            "maxTotalTokens": 816000,
+            "maxContextBytes": 200000,
+            "maxEvidenceRecords": 200,
+            "maxRecordBytes": 16384
+          },
+          "usage": {
+            "modelCalls": 2,
+            "repairAttempts": 1,
+            "retries": 0,
+            "inputTokens": 12500,
+            "outputTokens": 422,
+            "chargedTokens": 12922,
+            "unreportedCalls": 0,
+            "inconsistentReports": 0,
+            "tokenAccounting": "reported"
+          },
+          "startedAt": "2026-10-26T10:00:00.250Z",
+          "finishedAt": "2026-10-26T10:00:01.000Z",
+          "durationMs": 750
+        }
+      }
+    },
+    {
+      "id": "fx-003",
+      "bundleId": "bundle-a",
+      "label": "Scripted inconclusive reply",
+      "result": {
+        "schemaVersion": "0.1.0",
+        "caseId": "ec2275bde9750840",
+        "bundle": {
+          "files": {
+            "traces.jsonl": {
+              "sha256": "86b1c76076390d90bd5378d9469be38d0ad11330d7228a2a6a3f7cf0e3a0b08b"
+            },
+            "metrics.jsonl": {
+              "sha256": "0d0844f38c244895384050504db0ae40169242a0e810116a6ecacf140e7292a6"
+            },
+            "logs.jsonl": {
+              "sha256": "747bc2acadd8a1e0364feeb0bb71fcffff2f44c3a5e1e0469c3f19892b6c88ce"
+            }
+          }
+        },
+        "outcome": "inconclusive",
+        "findings": [],
+        "remediation": [],
+        "limitations": [
+          "The selected evidence shows no failing component."
+        ],
+        "selection": {
+          "limits": {
+            "maxRecords": 200,
+            "maxRecordBytes": 16384,
+            "maxBytes": 147542
+          },
+          "files": {
+            "traces.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "metrics.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "logs.jsonl": {
+              "records": 4,
+              "selected": 4,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            }
+          },
+          "selectedBytes": 16861,
+          "emptyFiles": [],
+          "truncatedTraceServices": [],
+          "notes": []
+        },
+        "run": {
+          "provider": "fake",
+          "model": "scripted",
+          "limits": {
+            "maxModelCalls": 4,
+            "maxRepairAttempts": 1,
+            "maxRetries": 2,
+            "retryBaseDelayMs": 1000,
+            "retryMaxDelayMs": 10000,
+            "perCallTimeoutMs": 60000,
+            "deadlineMs": 300000,
+            "maxOutputTokens": 4000,
+            "maxInputTokensPerCall": 200000,
+            "maxTotalTokens": 816000,
+            "maxContextBytes": 200000,
+            "maxEvidenceRecords": 200,
+            "maxRecordBytes": 16384
+          },
+          "usage": {
+            "modelCalls": 1,
+            "repairAttempts": 0,
+            "retries": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "chargedTokens": 204000,
+            "unreportedCalls": 1,
+            "inconsistentReports": 0,
+            "tokenAccounting": "estimated"
+          },
+          "startedAt": "2026-10-26T11:00:00.250Z",
+          "finishedAt": "2026-10-26T11:00:00.750Z",
+          "durationMs": 500
+        }
+      }
+    },
+    {
+      "id": "fx-004",
+      "bundleId": "bundle-a",
+      "label": "Scripted reply citing a record that does not exist",
+      "result": {
+        "schemaVersion": "0.1.0",
+        "caseId": "ec2275bde9750840",
+        "bundle": {
+          "files": {
+            "traces.jsonl": {
+              "sha256": "86b1c76076390d90bd5378d9469be38d0ad11330d7228a2a6a3f7cf0e3a0b08b"
+            },
+            "metrics.jsonl": {
+              "sha256": "0d0844f38c244895384050504db0ae40169242a0e810116a6ecacf140e7292a6"
+            },
+            "logs.jsonl": {
+              "sha256": "747bc2acadd8a1e0364feeb0bb71fcffff2f44c3a5e1e0469c3f19892b6c88ce"
+            }
+          }
+        },
+        "outcome": "failed",
+        "failure": {
+          "class": "evidence_verification_failed",
+          "message": "1 problem(s): line_out_of_range"
+        },
+        "findings": [],
+        "remediation": [],
+        "limitations": [],
+        "selection": {
+          "limits": {
+            "maxRecords": 200,
+            "maxRecordBytes": 16384,
+            "maxBytes": 147542
+          },
+          "files": {
+            "traces.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "metrics.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "logs.jsonl": {
+              "records": 4,
+              "selected": 4,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            }
+          },
+          "selectedBytes": 16861,
+          "emptyFiles": [],
+          "truncatedTraceServices": [],
+          "notes": []
+        },
+        "run": {
+          "provider": "fake",
+          "model": "scripted",
+          "limits": {
+            "maxModelCalls": 4,
+            "maxRepairAttempts": 1,
+            "maxRetries": 2,
+            "retryBaseDelayMs": 1000,
+            "retryMaxDelayMs": 10000,
+            "perCallTimeoutMs": 60000,
+            "deadlineMs": 300000,
+            "maxOutputTokens": 4000,
+            "maxInputTokensPerCall": 200000,
+            "maxTotalTokens": 816000,
+            "maxContextBytes": 200000,
+            "maxEvidenceRecords": 200,
+            "maxRecordBytes": 16384
+          },
+          "usage": {
+            "modelCalls": 2,
+            "repairAttempts": 1,
+            "retries": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "chargedTokens": 408000,
+            "unreportedCalls": 2,
+            "inconsistentReports": 0,
+            "tokenAccounting": "estimated"
+          },
+          "startedAt": "2026-10-26T12:00:00.250Z",
+          "finishedAt": "2026-10-26T12:00:01.000Z",
+          "durationMs": 750
+        }
+      }
+    },
+    {
+      "id": "fx-005",
+      "bundleId": "bundle-b",
+      "label": "Scripted reply",
+      "result": {
+        "schemaVersion": "0.1.0",
+        "caseId": "b70b149f892fa3b9",
+        "bundle": {
+          "files": {
+            "traces.jsonl": {
+              "sha256": "79db3a07aa4c3cae7b8f824c94831cf58e38c0d36208d20c1e880458ea561470"
+            },
+            "metrics.jsonl": {
+              "sha256": "9e2439c5fcb7d0f22296cf7ea9555ad8cd1e897e7887b34164763aefbbf2c966"
+            },
+            "logs.jsonl": {
+              "sha256": "100a9b8c0b3c57d27d333950a63e6e50d08e915aa6f76a39c6fa3dad7c5a88e0"
+            }
+          }
+        },
+        "outcome": "completed",
+        "findings": [
+          {
+            "id": "F1",
+            "kind": "root_cause",
+            "statement": "The cache node rejects requests because its connection slots are exhausted.",
+            "components": [
+              "cache-node"
+            ],
+            "confidence": "high",
+            "rationale": "Cache errors rise and the API logs exhausted connection slots.",
+            "evidence": [
+              {
+                "file": "metrics.jsonl",
+                "line": 1,
+                "series": {
+                  "name": "cache_requests_total",
+                  "labels": {
+                    "job": "orders-api",
+                    "result": "error"
+                  }
+                }
+              },
+              {
+                "file": "logs.jsonl",
+                "line": 4,
+                "time": "2026-01-01T00:00:04.000Z",
+                "service": "orders-api"
+              },
+              {
+                "file": "traces.jsonl",
+                "line": 1,
+                "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "verification": {
+              "referenceExists": "verified",
+              "identityMatches": "verified",
+              "integrity": "verified",
+              "includedInRequest": "verified",
+              "semanticSupport": "not_assessed"
+            }
+          },
+          {
+            "id": "F2",
+            "kind": "affected_component",
+            "statement": "Order reads fail in the orders API.",
+            "components": [
+              "orders-api"
+            ],
+            "confidence": "medium",
+            "rationale": "The failing trace is an order read.",
+            "evidence": [
+              {
+                "file": "traces.jsonl",
+                "line": 1,
+                "traceId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ],
+            "verification": {
+              "referenceExists": "verified",
+              "identityMatches": "verified",
+              "integrity": "verified",
+              "includedInRequest": "verified",
+              "semanticSupport": "not_assessed"
+            }
+          }
+        ],
+        "remediation": [
+          {
+            "step": "Restore cache capacity.",
+            "addresses": [
+              "F1"
+            ]
+          }
+        ],
+        "limitations": [],
+        "selection": {
+          "limits": {
+            "maxRecords": 200,
+            "maxRecordBytes": 16384,
+            "maxBytes": 147546
+          },
+          "files": {
+            "traces.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "metrics.jsonl": {
+              "records": 3,
+              "selected": 3,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "logs.jsonl": {
+              "records": 6,
+              "selected": 5,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 1
+              }
+            }
+          },
+          "selectedBytes": 2012,
+          "emptyFiles": [],
+          "truncatedTraceServices": [],
+          "notes": []
+        },
+        "run": {
+          "provider": "fake",
+          "model": "scripted",
+          "limits": {
+            "maxModelCalls": 4,
+            "maxRepairAttempts": 1,
+            "maxRetries": 2,
+            "retryBaseDelayMs": 1000,
+            "retryMaxDelayMs": 10000,
+            "perCallTimeoutMs": 60000,
+            "deadlineMs": 300000,
+            "maxOutputTokens": 4000,
+            "maxInputTokensPerCall": 200000,
+            "maxTotalTokens": 816000,
+            "maxContextBytes": 200000,
+            "maxEvidenceRecords": 200,
+            "maxRecordBytes": 16384
+          },
+          "usage": {
+            "modelCalls": 1,
+            "repairAttempts": 0,
+            "retries": 0,
+            "inputTokens": 1900,
+            "outputTokens": 380,
+            "chargedTokens": 2280,
+            "unreportedCalls": 0,
+            "inconsistentReports": 0,
+            "tokenAccounting": "reported"
+          },
+          "startedAt": "2026-10-26T13:00:00.250Z",
+          "finishedAt": "2026-10-26T13:00:00.750Z",
+          "durationMs": 500
+        }
+      }
+    },
+    {
+      "id": "fx-006",
+      "bundleId": "bundle-b",
+      "label": "Scripted provider failure: unavailable, every retry",
+      "result": {
+        "schemaVersion": "0.1.0",
+        "caseId": "b70b149f892fa3b9",
+        "bundle": {
+          "files": {
+            "traces.jsonl": {
+              "sha256": "79db3a07aa4c3cae7b8f824c94831cf58e38c0d36208d20c1e880458ea561470"
+            },
+            "metrics.jsonl": {
+              "sha256": "9e2439c5fcb7d0f22296cf7ea9555ad8cd1e897e7887b34164763aefbbf2c966"
+            },
+            "logs.jsonl": {
+              "sha256": "100a9b8c0b3c57d27d333950a63e6e50d08e915aa6f76a39c6fa3dad7c5a88e0"
+            }
+          }
+        },
+        "outcome": "failed",
+        "failure": {
+          "class": "provider_unavailable",
+          "message": "unavailable after 2 retries: synthetic outage"
+        },
+        "findings": [],
+        "remediation": [],
+        "limitations": [],
+        "selection": {
+          "limits": {
+            "maxRecords": 200,
+            "maxRecordBytes": 16384,
+            "maxBytes": 147546
+          },
+          "files": {
+            "traces.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "metrics.jsonl": {
+              "records": 3,
+              "selected": 3,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "logs.jsonl": {
+              "records": 6,
+              "selected": 5,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 1
+              }
+            }
+          },
+          "selectedBytes": 2012,
+          "emptyFiles": [],
+          "truncatedTraceServices": [],
+          "notes": []
+        },
+        "run": {
+          "provider": "fake",
+          "model": "scripted",
+          "limits": {
+            "maxModelCalls": 4,
+            "maxRepairAttempts": 1,
+            "maxRetries": 2,
+            "retryBaseDelayMs": 1000,
+            "retryMaxDelayMs": 10000,
+            "perCallTimeoutMs": 60000,
+            "deadlineMs": 300000,
+            "maxOutputTokens": 4000,
+            "maxInputTokensPerCall": 200000,
+            "maxTotalTokens": 816000,
+            "maxContextBytes": 200000,
+            "maxEvidenceRecords": 200,
+            "maxRecordBytes": 16384
+          },
+          "usage": {
+            "modelCalls": 3,
+            "repairAttempts": 0,
+            "retries": 2,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "chargedTokens": 612000,
+            "unreportedCalls": 3,
+            "inconsistentReports": 0,
+            "tokenAccounting": "estimated"
+          },
+          "startedAt": "2026-10-26T14:00:00.250Z",
+          "finishedAt": "2026-10-26T14:00:01.750Z",
+          "durationMs": 1500
+        }
+      }
+    },
+    {
+      "id": "fx-007",
+      "bundleId": "bundle-b",
+      "label": "Token budget for one call, then an unavailable provider",
+      "result": {
+        "schemaVersion": "0.1.0",
+        "caseId": "b70b149f892fa3b9",
+        "bundle": {
+          "files": {
+            "traces.jsonl": {
+              "sha256": "79db3a07aa4c3cae7b8f824c94831cf58e38c0d36208d20c1e880458ea561470"
+            },
+            "metrics.jsonl": {
+              "sha256": "9e2439c5fcb7d0f22296cf7ea9555ad8cd1e897e7887b34164763aefbbf2c966"
+            },
+            "logs.jsonl": {
+              "sha256": "100a9b8c0b3c57d27d333950a63e6e50d08e915aa6f76a39c6fa3dad7c5a88e0"
+            }
+          }
+        },
+        "outcome": "budget_exceeded",
+        "failure": {
+          "class": "resource_limit_exceeded",
+          "message": "the token budget (204000) has 0 tokens left, less than one call's ceiling (204000)"
+        },
+        "findings": [],
+        "remediation": [],
+        "limitations": [],
+        "selection": {
+          "limits": {
+            "maxRecords": 200,
+            "maxRecordBytes": 16384,
+            "maxBytes": 147546
+          },
+          "files": {
+            "traces.jsonl": {
+              "records": 2,
+              "selected": 2,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "metrics.jsonl": {
+              "records": 3,
+              "selected": 3,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 0
+              }
+            },
+            "logs.jsonl": {
+              "records": 6,
+              "selected": 5,
+              "omitted": {
+                "record_limit": 0,
+                "context_limit": 0,
+                "record_too_large": 0,
+                "repeated": 1
+              }
+            }
+          },
+          "selectedBytes": 2012,
+          "emptyFiles": [],
+          "truncatedTraceServices": [],
+          "notes": []
+        },
+        "run": {
+          "provider": "fake",
+          "model": "scripted",
+          "limits": {
+            "maxModelCalls": 4,
+            "maxRepairAttempts": 1,
+            "maxRetries": 2,
+            "retryBaseDelayMs": 1000,
+            "retryMaxDelayMs": 10000,
+            "perCallTimeoutMs": 60000,
+            "deadlineMs": 300000,
+            "maxOutputTokens": 4000,
+            "maxInputTokensPerCall": 200000,
+            "maxTotalTokens": 204000,
+            "maxContextBytes": 200000,
+            "maxEvidenceRecords": 200,
+            "maxRecordBytes": 16384
+          },
+          "usage": {
+            "modelCalls": 1,
+            "repairAttempts": 0,
+            "retries": 1,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "chargedTokens": 204000,
+            "unreportedCalls": 1,
+            "inconsistentReports": 0,
+            "tokenAccounting": "estimated"
+          },
+          "startedAt": "2026-10-26T15:00:00.250Z",
+          "finishedAt": "2026-10-26T15:00:01.250Z",
+          "durationMs": 1000
+        }
+      }
+    },
+    {
+      "id": "fx-008",
+      "bundleId": "bundle-c",
+      "label": "Bundle refused at admission",
+      "result": {
+        "schemaVersion": "0.1.0",
+        "caseId": null,
+        "bundle": null,
+        "outcome": "failed",
+        "failure": {
+          "class": "invalid_bundle",
+          "message": "4 contract issue(s) under rule(s) 4, 9"
+        },
+        "findings": [],
+        "remediation": [],
+        "limitations": [],
+        "selection": null,
+        "run": {
+          "provider": "fake",
+          "model": "scripted",
+          "limits": {
+            "maxModelCalls": 4,
+            "maxRepairAttempts": 1,
+            "maxRetries": 2,
+            "retryBaseDelayMs": 1000,
+            "retryMaxDelayMs": 10000,
+            "perCallTimeoutMs": 60000,
+            "deadlineMs": 300000,
+            "maxOutputTokens": 4000,
+            "maxInputTokensPerCall": 200000,
+            "maxTotalTokens": 816000,
+            "maxContextBytes": 200000,
+            "maxEvidenceRecords": 200,
+            "maxRecordBytes": 16384
+          },
+          "usage": {
+            "modelCalls": 0,
+            "repairAttempts": 0,
+            "retries": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "chargedTokens": 0,
+            "unreportedCalls": 0,
+            "inconsistentReports": 0,
+            "tokenAccounting": "reported"
+          },
+          "startedAt": "2026-10-26T16:00:00.250Z",
+          "finishedAt": "2026-10-26T16:00:00.250Z",
+          "durationMs": 0
+        }
+      }
+    }
+  ]
+}

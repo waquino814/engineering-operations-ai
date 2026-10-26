@@ -2,7 +2,7 @@
 
 - **Status:** Proposed (2026-10-26). Implemented in the E2/E3 foundation for review; not approved by the repository owner. Reviewed and revised on 2026-10-26 (leak detection hardened); see "Review".
 - **Date:** 2026-10-26
-- **Depends on (accepted):** [0003](0003-ground-truth-isolation.md) (evaluation is the only other reader of the answer key; hold out seeds and scenarios; vary timing), [0004](0004-investigation-result-contract.md). Proposed companions: [0006](0006-investigation-pipeline-and-limits.md), [0010](0010-investigation-result-contract-v0.md).
+- **Depends on (accepted):** [0003](0003-ground-truth-isolation.md) (evaluation is the only other reader of the answer key; hold out seeds and scenarios; vary timing), [0004](0004-investigation-result-contract.md). Proposed companions: [0006](0006-investigation-pipeline-and-limits.md). Accepted since: [0010](0010-investigation-result-contract-v0.md) (2026-10-26).
 
 ## Context
 

@@ -59,7 +59,7 @@ The report is checked into [`test/golden/synthetic-evaluation.json`](../test/gol
 
 ## Holdout strategy (for real-model evaluation)
 
-Not yet run; it needs a provider adapter ([ADR 0008](adr/0008-model-provider-recommendation.md), proposed) and the owner's approval of the cost.
+Not yet run; it needs a provider adapter ([ADR 0008](adr/0008-model-provider-recommendation.md), proposed) and the owner's approval of the cost. On the [roadmap](roadmap.md), a controlled first run belongs to E5 and per-scenario scoring to E7, both after the UI (E4).
 
 - Tune instructions and selection only on the committed excerpt and synthetic bundles.
 - Score real bundles as a held-out set: new seeds of known scenarios, and at least one scenario never used during tuning.

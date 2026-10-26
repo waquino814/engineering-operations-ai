@@ -275,7 +275,7 @@ describe('the source tree', () => {
   const sources = async () =>
     Promise.all(
       (await readdir(root, { recursive: true }))
-        .filter((f) => f.endsWith('.ts'))
+        .filter((f) => /\.tsx?$/.test(f))
         .map(async (f) => ({ file: f, text: await readFile(join(root, f), 'utf8') })),
     );
 
@@ -295,6 +295,13 @@ describe('the source tree', () => {
     const importers = (await sources())
       .filter(({ text }) => /from '(\.\.\/|\.\/)(intake\/)?validate-bundle\.ts'/.test(text))
       .map(({ file }) => file);
-    expect(importers.sort()).toEqual(['cli.ts', 'index.ts', 'pipeline/run-investigation.ts']);
+    // The console's fixture generator validates its fixture bundles (ADR 0011); it never opens
+    // evidence for an investigation itself, which runs through the pipeline.
+    expect(importers.sort()).toEqual([
+      'cli.ts',
+      'evaluation/ui-fixtures.ts',
+      'index.ts',
+      'pipeline/run-investigation.ts',
+    ]);
   });
 });
