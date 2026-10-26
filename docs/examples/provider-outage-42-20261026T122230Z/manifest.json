@@ -1,0 +1,190 @@
+{
+  "bundleId": "provider-outage-42-20261026T122230Z",
+  "capture": {
+    "logs": {
+      "services": [
+        {
+          "droppedAdminLines": 0,
+          "name": "orders-api",
+          "nonJsonLines": 0,
+          "records": 3406
+        },
+        {
+          "droppedAdminLines": 0,
+          "name": "worker",
+          "nonJsonLines": 0,
+          "records": 4305
+        }
+      ],
+      "source": "docker-compose"
+    },
+    "metrics": {
+      "series": [
+        {
+          "name": "http_server_request_duration_seconds_bucket",
+          "seriesCount": 75
+        },
+        {
+          "name": "http_server_request_duration_seconds_count",
+          "seriesCount": 5
+        },
+        {
+          "name": "http_server_request_duration_seconds_sum",
+          "seriesCount": 5
+        },
+        {
+          "name": "db_client_connection_count",
+          "seriesCount": 8
+        },
+        {
+          "name": "db_client_connection_pending_requests",
+          "seriesCount": 4
+        },
+        {
+          "name": "db_client_connection_max",
+          "seriesCount": 4
+        },
+        {
+          "name": "commerce_orders",
+          "seriesCount": 5
+        },
+        {
+          "name": "commerce_worker_passes_total",
+          "seriesCount": 8
+        },
+        {
+          "name": "commerce_worker_inflight",
+          "seriesCount": 1
+        },
+        {
+          "name": "commerce_payment_calls_total",
+          "seriesCount": 5
+        },
+        {
+          "name": "commerce_payment_duration_seconds_bucket",
+          "seriesCount": 75
+        },
+        {
+          "name": "commerce_payment_duration_seconds_count",
+          "seriesCount": 5
+        },
+        {
+          "name": "commerce_payment_duration_seconds_sum",
+          "seriesCount": 5
+        },
+        {
+          "name": "commerce_claims_recovered_total",
+          "seriesCount": 2
+        },
+        {
+          "name": "commerce_claims_released_total",
+          "seriesCount": 2
+        }
+      ],
+      "source": "prometheus",
+      "stepSeconds": 5
+    },
+    "traces": {
+      "droppedAdminSpans": 0,
+      "maxTracesPerService": 5000,
+      "minSliceSeconds": 1,
+      "searchDepth": 1000,
+      "services": [
+        {
+          "name": "orders-api",
+          "saturatedSlices": 0,
+          "traces": 1500,
+          "truncated": false,
+          "truncationReasons": []
+        },
+        {
+          "name": "worker",
+          "saturatedSlices": 0,
+          "traces": 1523,
+          "truncated": false,
+          "truncationReasons": []
+        }
+      ],
+      "sliceSeconds": 10,
+      "source": "jaeger-v3"
+    }
+  },
+  "createdAt": "2026-10-26T12:25:16.661Z",
+  "detection": {
+    "deadlineSeconds": 120,
+    "detectedAt": "2026-10-26T12:23:15.329Z",
+    "latencyMs": 15005
+  },
+  "files": {
+    "ground_truth.json": {
+      "bytes": 2019,
+      "records": 1,
+      "sha256": "c9d5b17b50251a09d226d0f8bd4ddcf17b45f1acc8eabc706e1aaed36cc237db"
+    },
+    "logs.jsonl": {
+      "bytes": 2436528,
+      "records": 7711,
+      "sha256": "be5f8fc2a2cce4366d3482bee4b55293bda1460b3776c4c720ad715370fff1f5"
+    },
+    "metrics.jsonl": {
+      "bytes": 271116,
+      "records": 209,
+      "sha256": "29b53acd318e726c1791cb15f05645f787c3b30e2a848bb176849c2585ffc422"
+    },
+    "traces.jsonl": {
+      "bytes": 17726492,
+      "records": 3023,
+      "sha256": "7e7e6f69541c5e2e16d227353d6859bf9a33d42e5b97530f2d2b7c03929f8935"
+    }
+  },
+  "infrastructure": {
+    "images": {
+      "jaeger": "jaegertracing/jaeger:2.22.0",
+      "orders-api": "commerce-platform:local",
+      "otel-collector": "otel/opentelemetry-collector-contrib:0.162.0",
+      "postgres": "postgres:16",
+      "prometheus": "prom/prometheus:v3.15.0",
+      "worker": "sha256:c957943f283b31a374b7d80f7789f99d69868650c7553c048917fbae3760842d"
+    }
+  },
+  "load": {
+    "planHash": "c5ff38777f042dbadcfe9cd0e3fae6d5d0c5802268dbb4b9e18697c414965353",
+    "profile": "incident",
+    "runPrefix": "lg-919f6fbb-119e-48d9-ae3f-8ba6ca483d38",
+    "seed": 42
+  },
+  "producer": {
+    "commit": "93ad2131255eed89baa4d3ba67cbf649a49925ee",
+    "dirty": false,
+    "repository": "commerce-platform"
+  },
+  "scenario": {
+    "name": "provider-outage",
+    "seed": 42,
+    "version": 1
+  },
+  "schemaVersion": "1.0.0",
+  "services": [
+    {
+      "instanceId": "a528255144d3",
+      "name": "orders-api",
+      "version": "0.0.0"
+    },
+    {
+      "instanceId": "worker-1",
+      "name": "worker",
+      "version": "0.0.0"
+    }
+  ],
+  "trigger": {
+    "requestedDurationMs": 90000,
+    "startedAt": "2026-10-26T12:23:00.324Z",
+    "stoppedAt": "2026-10-26T12:24:30.319Z"
+  },
+  "window": {
+    "captureFrom": "2026-10-26T12:22:30.308Z",
+    "captureTo": "2026-10-26T12:25:15.217Z",
+    "loadEndedAt": "2026-10-26T12:25:00.217Z",
+    "loadStartedAt": "2026-10-26T12:22:30.308Z"
+  }
+}
