@@ -28,7 +28,7 @@ describe('a completed investigation', () => {
         .map((li) => li.textContent),
     ).toEqual(['payment-provider root cause', 'worker']);
     const subtitle = document.querySelector('.page__subtitle');
-    expect(subtitle?.textContent).toBe('Scripted reply · Fixture');
+    expect(subtitle?.textContent).toBe('Scripted reply · Fixture · Simulated · scripted');
   });
 
   it('shows each finding with its evidence and every verification statement', async () => {
@@ -73,7 +73,7 @@ describe('a completed investigation', () => {
       'log record from worker',
     );
     const run = region('Run');
-    expect(run.textContent).toContain('fake · scripted');
+    expect(run.textContent).toContain('Simulated · scripted');
     expect(run.textContent).toContain('1 (0 retries, 0 repairs)');
     expect(run.textContent).toContain('6,200 in · 410 out');
     expect(run.textContent).toContain('6,610 of 816,000 budget');

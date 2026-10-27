@@ -46,7 +46,7 @@ describe('refusal and startup happen before any bundle access', () => {
     expect(accesses().every((n) => n === 0)).toBe(true);
   });
 
-  it('refuses unknown providers and the blocked local provider the same way', async () => {
+  it('refuses unknown providers, including the retired local name, the same way', async () => {
     const w = await workspace();
     vi.clearAllMocks();
     for (const v of ['nope', 'local', 'Anthropic'])
@@ -68,20 +68,24 @@ describe('refusal and startup happen before any bundle access', () => {
     const w = await workspace();
     vi.clearAllMocks();
     const app = createApplication(w.env(), { fakeSteps: w.steps });
-    expect(app.config.provider.name).toBe('fake');
+    expect(app.config.pinned).toBeNull();
     expect(accesses().every((n) => n === 0)).toBe(true);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('refuses a fake provider with no scripted replies before reading the bundle', async () => {
+  it('refuses an unverifiable Ollama before reading the bundles directory', async () => {
     const w = await workspace();
-    const app = createApplication(w.env());
-    vi.clearAllMocks();
-    expect(await app.startInvestigation(w.excerptId)).toEqual({
-      status: 'refused',
-      reason: 'no_runnable_provider',
+    const refusingFetch = vi.fn(() => Promise.reject(new Error('connect ECONNREFUSED')));
+    const app = createApplication(w.env({ EOAI_MODEL_PROVIDER: 'ollama' }), {
+      ollamaFetch: refusingFetch,
     });
-    expect(accesses().every((n) => n === 0)).toBe(true);
+    vi.clearAllMocks();
+    const out = await app.startInvestigation(w.excerptId);
+    expect(out).toMatchObject({ status: 'refused', reason: 'provider_blocked' });
+    expect(refusingFetch).toHaveBeenCalledTimes(1);
+    for (const k of ['readdir', 'lstat', 'realpath', 'mkdir', 'writeFile'] as const)
+      expect(vi.mocked(fs[k]).mock.calls.length, k).toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('starts the server and answers liveness without any filesystem access', async () => {

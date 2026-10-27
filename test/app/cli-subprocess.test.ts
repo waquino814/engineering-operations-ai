@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { request } from 'node:http';
-import { access } from 'node:fs/promises';
+import { access, readdir } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { workspace } from './support.ts';
@@ -53,21 +53,22 @@ describe('src/cli.ts investigate, as a real subprocess', () => {
       expect(r.code).toBe(2);
       expect(r.stdout).toBe('');
       // The policy message, not a permission error: nothing outside the source tree was read.
-      expect(r.stderr).toMatch(/not permitted|blocked until/);
+      expect(r.stderr).toMatch(/not permitted/);
       expect(r.stderr).not.toMatch(/ERR_ACCESS_PERMISSION|sk-ant-not-a-real-key/);
       await expect(access(w.runsDir)).rejects.toThrow();
     },
   );
 
   it.each([[{}], [{ EOAI_MODEL_PROVIDER: '' }], [{ EOAI_MODEL_PROVIDER: 'fake' }]])(
-    'explains that the fake provider has nothing scripted, with exit 2, for %j',
+    'runs a labelled simulated investigation by default and stores it, for %j',
     async (extra) => {
       const w = await workspace();
-      const r = await cliRun(['investigate', w.excerptId], w.env(extra));
-      expect(r.code).toBe(2);
-      expect(r.stderr).toContain('no runnable provider');
-      expect(r.stderr).not.toContain('ERR_ACCESS_PERMISSION');
-      await expect(access(w.runsDir)).rejects.toThrow();
+      // Without the permission model: the run reads the bundle and writes the run store.
+      const r = await run(process.execPath, [cli, 'investigate', w.excerptId], {
+        env: w.env(extra),
+      });
+      expect(r.stdout).toMatch(/^run \d{8}T\d{6}Z-[0-9a-f]{16}: completed, 1 finding\(s\)/);
+      expect(await readdir(w.runsDir)).toHaveLength(1);
     },
   );
 
@@ -89,7 +90,7 @@ describe('src/cli.ts investigate, as a real subprocess', () => {
 
   it.each([
     [['serve'], { EOAI_MODEL_PROVIDER: 'anthropic' }, /not permitted/],
-    [['serve'], { EOAI_MODEL_PROVIDER: 'local' }, /blocked until/],
+    [['serve'], { EOAI_MODEL_PROVIDER: 'local' }, /not permitted/],
     [['serve', '--host', '0.0.0.0'], {}, /loopback/],
   ])('serve %j fails closed with exit 2 and never listens', async (argv, extra, message) => {
     const w = await workspace();

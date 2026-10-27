@@ -47,3 +47,5 @@ export async function workspace() {
     steps,
   };
 }
+
+export { chatReply, ollamaStub, type StubModel } from '../providers/ollama-stub.ts';

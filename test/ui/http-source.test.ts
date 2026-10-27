@@ -122,23 +122,66 @@ describe('listing and reading investigations', () => {
   });
 });
 
-describe('provider status', () => {
-  it('reads whether a run can start, and rejects a malformed status', async () => {
-    const reason = 'no runnable provider. Nothing was run.';
-    const a = stub({ '/api/status': { body: { provider: 'fake', runnable: false, reason } } });
-    expect(await a.source.getProviderStatus()).toEqual({
-      provider: 'fake',
-      runnable: false,
-      reason,
-    });
-    const b = stub({ '/api/status': { body: { provider: 'fake', runnable: true, reason: null } } });
-    expect((await b.source.getProviderStatus()).runnable).toBe(true);
-    const c = stub({
-      '/api/status': { body: { provider: 'fake', runnable: 'yes', reason: null } },
-    });
-    await expect(c.source.getProviderStatus()).rejects.toThrow(/malformed/);
+describe('provider status and settings', () => {
+  const status = {
+    selected: 'ollama',
+    pinned: false,
+    runnable: false,
+    simulated: false,
+    model: 'gemma:12b',
+    models: ['gemma:12b'],
+    reason: 'Ollama is not reachable. Nothing was run.',
+  };
+
+  it('reads the selection and its readiness, and rejects a malformed status', async () => {
+    const a = stub({ '/api/status': { body: status } });
+    expect(await a.source.getProviderStatus()).toEqual(status);
+    for (const bad of [
+      { ...status, selected: 'anthropic' },
+      { ...status, runnable: 'yes' },
+      { ...status, models: [1] },
+      { ...status, model: 3 },
+      { ...status, reason: 3 },
+      { ...status, pinned: null },
+    ]) {
+      const b = stub({ '/api/status': { body: bad } });
+      await expect(b.source.getProviderStatus()).rejects.toThrow(/malformed/);
+    }
     const d = stub({ '/api/status': { status: 502, raw: '' } });
     await expect(d.source.getProviderStatus()).rejects.toThrow(/not reachable/);
+  });
+
+  it('reads settings and saves a choice with a PUT of exactly the choice', async () => {
+    const saved = { provider: 'ollama', ollamaModel: null, pinned: false };
+    const { source, calls } = stub({
+      '/api/settings': [{ body: { ...saved, provider: 'fake' } }, { body: saved }],
+    });
+    expect(await source.getSettings()).toEqual({ ...saved, provider: 'fake' });
+    expect(await source.saveSettings({ provider: 'ollama', ollamaModel: null })).toEqual(saved);
+    expect(calls[1]?.init?.method).toBe('PUT');
+    expect(calls[1]?.init?.body).toBe('{"provider":"ollama","ollamaModel":null}');
+  });
+
+  it('reports a refused or malformed settings answer as an error', async () => {
+    const refused = stub({
+      '/api/settings': {
+        status: 409,
+        body: { error: { code: 'provider_pinned', message: 'fixed' } },
+      },
+    });
+    await expect(
+      refused.source.saveSettings({ provider: 'fake', ollamaModel: null }),
+    ).rejects.toMatchObject({
+      code: 'provider_pinned',
+    });
+    const bad = stub({
+      '/api/settings': { body: { provider: 'anthropic', ollamaModel: null, pinned: false } },
+    });
+    await expect(bad.source.getSettings()).rejects.toThrow(/malformed/);
+    const bad2 = stub({
+      '/api/settings': { body: { provider: 'fake', ollamaModel: 4, pinned: false } },
+    });
+    await expect(bad2.source.getSettings()).rejects.toThrow(/malformed/);
   });
 });
 

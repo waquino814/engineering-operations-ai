@@ -25,7 +25,8 @@
     "dev": "node scripts/dev.ts",
     "serve": "node src/cli.ts serve",
     "demo:seed": "node scripts/seed-demo.ts",
-    "ui:dev": "vite",
+    "ui:dev": "node scripts/dev.ts",
+    "ui:vite": "vite",
     "ui:build": "vite build"
   },
   "dependencies": {

@@ -52,10 +52,7 @@ async function investigate(
   }
   const outcome = await app.startInvestigation(bundleId);
   if (outcome.status === 'refused') {
-    err.write(
-      'no runnable provider: the fake provider has no scripted replies, and it is not a model. ' +
-        'Nothing was run.\n',
-    );
+    err.write(`${outcome.message}\n`);
     return 2;
   }
   if (outcome.status === 'error') {

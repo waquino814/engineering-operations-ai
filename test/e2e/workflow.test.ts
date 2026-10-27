@@ -1,12 +1,11 @@
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
-import { request } from 'node:http';
+import { createServer as createHttpServer, request } from 'node:http';
 import { createServer, connect } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApplication } from '../../src/app/application.ts';
 import { openEvidence } from '../../src/index.ts';
 import { readInvestigationResult, type InvestigationResult } from '../../src/index.ts';
 import { goodOutput } from '../investigation/support.ts';
@@ -148,12 +147,105 @@ const closed = (port: number) =>
     });
   });
 
+/**
+ * A stand-in for the local Ollama runtime: a real loopback HTTP server in this process, speaking
+ * the three endpoints the adapter uses. No model and no inference are involved.
+ */
+interface OllamaStubServer {
+  port: number;
+  chats: number;
+  close(): Promise<void>;
+}
+async function startOllamaStub(chatText: () => string): Promise<OllamaStubServer> {
+  const state = { chats: 0 };
+  const server = createHttpServer((req, res) => {
+    let body = '';
+    req.on('data', (c: Buffer) => (body += c.toString()));
+    req.on('end', () => {
+      const send = (status: number, doc: unknown) => {
+        res.writeHead(status, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(doc));
+      };
+      if (req.url === '/api/tags') {
+        send(200, {
+          models: [
+            {
+              name: 'tiny:1b',
+              model: 'tiny:1b',
+              modified_at: '2026-01-01T00:00:00Z',
+              size: 7_000_000_000,
+              digest: 'abc',
+              details: {},
+              capabilities: [],
+            },
+          ],
+        });
+        return;
+      }
+      if (req.url === '/api/show') {
+        send(200, { details: {}, model_info: { a: 1 }, capabilities: [] });
+        return;
+      }
+      if (req.url === '/api/chat') {
+        state.chats += 1;
+        send(200, {
+          message: { role: 'assistant', content: chatText() },
+          done: true,
+          prompt_eval_count: 100,
+          eval_count: 50,
+        });
+        return;
+      }
+      send(404, {});
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  return {
+    port: (server.address() as { port: number }).port,
+    get chats() {
+      return state.chats;
+    },
+    close: () =>
+      new Promise<void>((r) => {
+        server.close(() => {
+          r();
+        });
+        server.closeAllConnections();
+      }),
+  };
+}
+
 let home: string;
 let apiPort: number;
 let uiPort: number;
 let env: Record<string, string>;
 let dev: Proc;
 let readyMark = 0;
+let fakeRunId = '';
+let ollamaRunId = '';
+let ollamaText = '';
+
+/** Every citation resolves to a real line of the bundle and quotes values found on it. */
+async function citationsAreInTheBundle(result: InvestigationResult) {
+  expect(result.findings.length).toBeGreaterThan(0);
+  for (const finding of result.findings)
+    for (const ref of finding.evidence) {
+      const lines = (await readFile(join(data(), 'bundles', EXCERPT, ref.file), 'utf8')).split(
+        '\n',
+      );
+      const text = lines[ref.line - 1] ?? '';
+      expect(text, `${ref.file}:${String(ref.line)}`).not.toBe('');
+      const quoted = [
+        ref.time,
+        ref.service,
+        ref.traceId,
+        ref.spanId,
+        ref.series?.name,
+        ...Object.values(ref.series?.labels ?? {}),
+      ];
+      for (const q of quoted) if (q !== undefined) expect(text).toContain(q);
+    }
+}
 const data = () => join(home, '.engineering-operations-ai');
 
 async function startDev() {
@@ -195,12 +287,19 @@ describe('local workflow, as real processes', { timeout: 120_000 }, () => {
     expect(mod.type).toContain('javascript');
   });
 
-  it('is honest while empty: no bundles, no runs, and no runnable provider', async () => {
+  it('starts empty, with Fake selected and its output declared simulated', async () => {
     expect((await http(uiPort, 'GET', '/api/bundles')).json()).toEqual({ bundles: [] });
     expect((await http(uiPort, 'GET', '/api/runs')).json()).toEqual({ runs: [] });
-    const status = (await http(uiPort, 'GET', '/api/status')).json();
-    expect(status).toMatchObject({ provider: 'fake', runnable: false });
-    expect(String(status['reason'])).toContain('Nothing was run');
+    expect((await http(uiPort, 'GET', '/api/settings')).json()).toMatchObject({
+      provider: 'fake',
+      ollamaModel: null,
+      pinned: false,
+    });
+    expect((await http(uiPort, 'GET', '/api/status')).json()).toMatchObject({
+      selected: 'fake',
+      runnable: true,
+      simulated: true,
+    });
   });
 
   it('seeds the synthetic bundles once, never overwriting, then lists and validates them', async () => {
@@ -227,22 +326,38 @@ describe('local workflow, as real processes', { timeout: 120_000 }, () => {
     }
   });
 
-  it('refuses to start an investigation with no runnable provider, and stores nothing', async () => {
+  it('runs Fake end to end through the proxy: simulated, persisted, labelled', async () => {
     const r = await post(uiPort, JSON.stringify({ bundleId: EXCERPT }), {
       origin: `http://localhost:${String(uiPort)}`,
     });
-    expect(r.status).toBe(409);
-    expect(r.json()).toMatchObject({ error: { code: 'no_runnable_provider' } });
-    expect(r.json()).not.toHaveProperty('runId');
-    expect((await http(uiPort, 'GET', '/api/runs')).json()).toEqual({ runs: [] });
+    expect(r.status).toBe(201);
+    fakeRunId = String(r.json()['runId']);
+    const got = (await http(uiPort, 'GET', `/api/runs/${fakeRunId}`)).json();
+    const read = readInvestigationResult(got.result);
+    expect(read.ok).toBe(true);
+    if (!read.ok) return;
+    expect(read.result.run).toMatchObject({
+      provider: 'fake',
+      model: 'simulated-deterministic-v1',
+    });
+    expect(read.result.limitations.join(' ')).toContain('SIMULATED');
+    expect(read.result.findings.map((f) => f.kind)).toEqual(['symptom']);
+    await citationsAreInTheBundle(read.result);
   });
 
   it('rejects malformed requests, bad ids and missing things with structured errors', async () => {
     const cases: [Promise<Reply>, number, string][] = [
       [post(uiPort, '{oops'), 400, 'bad_request'],
       [post(uiPort, '{"bundleId":"a","extra":1}'), 400, 'bad_request'],
-      // The provider gate answers before the id is even looked at.
-      [post(uiPort, JSON.stringify({ bundleId: '../x' })), 409, 'no_runnable_provider'],
+      [post(uiPort, JSON.stringify({ bundleId: '../x' })), 400, 'invalid_bundle_id'],
+      [
+        http(uiPort, 'PUT', '/api/settings', {
+          body: '{"provider":"anthropic"}',
+          headers: { 'content-type': 'application/json' },
+        }),
+        400,
+        'bad_request',
+      ],
       [
         http(uiPort, 'POST', '/api/investigations', {
           body: '{}',
@@ -277,53 +392,104 @@ describe('local workflow, as real processes', { timeout: 120_000 }, () => {
     if (lan) expect(await closed2(lan.address, apiPort)).toBe(true);
   });
 
-  it('keeps a stored run across navigation and restart, citing only evidence that is in the bundle', async () => {
-    // A run made by the application layer with a scripted fake provider, as the tests do:
-    // the CLI has no scripted replies, so no investigation can be produced by the product itself.
-    const bundles = join(data(), 'bundles');
-    const view = await openEvidence(join(bundles, EXCERPT));
-    const app = createApplication(
-      { EOAI_BUNDLES_DIR: bundles, EOAI_RUNS_DIR: join(data(), 'runs') },
-      { fakeSteps: [{ reply: goodOutput(view) }] },
-    );
-    const started = await app.startInvestigation(EXCERPT);
-    if (started.status !== 'done') throw new Error('expected a stored run');
+  it('selects Ollama, keeps the choice across a restart, and runs through the local runtime', async () => {
+    const stub = await startOllamaStub(() => ollamaText);
+    try {
+      // The application is restarted so that it reaches the stub runtime, as it would the real one.
+      expect(await stop(dev)).toBe(0);
+      env = { ...env, EOAI_OLLAMA_URL: `http://127.0.0.1:${String(stub.port)}` };
+      await startDev();
+      const put = await http(uiPort, 'PUT', '/api/settings', {
+        body: '{"provider":"ollama","ollamaModel":null}',
+        headers: { 'content-type': 'application/json' },
+      });
+      expect(put.json()).toMatchObject({ provider: 'ollama' });
+      expect((await http(uiPort, 'GET', '/api/status')).json()).toMatchObject({
+        selected: 'ollama',
+        runnable: true,
+        simulated: false,
+        model: 'tiny:1b',
+      });
 
-    const check = async () => {
-      const list = (await http(uiPort, 'GET', '/api/runs')).json().runs;
-      expect(list.map((r) => r.id)).toEqual([started.runId]);
-      const got = (await http(uiPort, 'GET', `/api/runs/${started.runId}`)).json();
-      const read = readInvestigationResult(got.result);
-      expect(read.ok).toBe(true);
-      return read.ok ? read.result : null;
-    };
-    const before = await check();
-    await check(); // navigating away and back
+      // The choice survives a restart.
+      expect(await stop(dev)).toBe(0);
+      await startDev();
+      expect((await http(uiPort, 'GET', '/api/settings')).json()).toMatchObject({
+        provider: 'ollama',
+      });
+
+      // A model reply that cites real records is accepted, stored, and labelled as Ollama's.
+      const view = await openEvidence(join(data(), 'bundles', EXCERPT));
+      ollamaText = JSON.stringify(goodOutput(view));
+      const r = await post(uiPort, JSON.stringify({ bundleId: EXCERPT }));
+      expect(r.status).toBe(201);
+      ollamaRunId = String(r.json()['runId']);
+      expect(stub.chats).toBe(1);
+      const stored = readInvestigationResult(
+        (await http(uiPort, 'GET', `/api/runs/${ollamaRunId}`)).json().result,
+      );
+      expect(stored.ok).toBe(true);
+      if (!stored.ok) return;
+      expect(stored.result.run).toMatchObject({ provider: 'ollama', model: 'tiny:1b' });
+      expect(stored.result.outcome).toBe('completed');
+      await citationsAreInTheBundle(stored.result);
+
+      // A reply that cites a record the bundle does not have is rejected, never repaired into success.
+      const good = goodOutput(view);
+      const [first] = good.findings;
+      if (!first) throw new Error('the scripted output has a finding');
+      ollamaText = JSON.stringify(
+        goodOutput(view, {
+          findings: [
+            {
+              ...first,
+              evidence: [{ file: 'logs.jsonl', line: 999, time: 't', service: 'worker' }],
+            },
+          ],
+        }),
+      );
+      const bad = await post(uiPort, JSON.stringify({ bundleId: EXCERPT }));
+      expect(bad.status).toBe(201);
+      const badRun = readInvestigationResult(
+        (await http(uiPort, 'GET', `/api/runs/${String(bad.json()['runId'])}`)).json().result,
+      );
+      expect(badRun.ok && badRun.result.outcome).toBe('failed');
+      expect(badRun.ok && badRun.result.findings).toEqual([]);
+    } finally {
+      await stub.close();
+    }
+
+    // The runtime is gone: selecting Ollama stays possible, the run is refused, nothing falls back.
+    const before = (await http(uiPort, 'GET', '/api/runs')).json().runs.length;
+    const status = (await http(uiPort, 'GET', '/api/status')).json();
+    expect(status).toMatchObject({ selected: 'ollama', runnable: false });
+    const refused = await post(uiPort, JSON.stringify({ bundleId: EXCERPT }));
+    expect([refused.status, refused.json().error.code]).toEqual([409, 'provider_blocked']);
+    expect((await http(uiPort, 'GET', '/api/runs')).json().runs.length).toBe(before);
+  });
+
+  it('switches back to Fake without touching earlier results, across a restart', async () => {
+    await http(uiPort, 'PUT', '/api/settings', {
+      body: '{"provider":"fake"}',
+      headers: { 'content-type': 'application/json' },
+    });
     expect(await stop(dev)).toBe(0);
     expect(await closed(apiPort)).toBe(true);
     expect(await closed(uiPort)).toBe(true);
     await startDev();
-    expect(await check()).toEqual(before);
-
-    // Every citation resolves to a real line of the bundle and quotes values found on it.
-    const result = before as InvestigationResult;
-    expect(result.run.provider).toBe('fake');
-    expect(result.findings.length).toBeGreaterThan(0);
-    for (const finding of result.findings)
-      for (const ref of finding.evidence) {
-        const lines = (await readFile(join(bundles, EXCERPT, ref.file), 'utf8')).split('\n');
-        const text = lines[ref.line - 1] ?? '';
-        expect(text, `${ref.file}:${String(ref.line)}`).not.toBe('');
-        const quoted = [
-          ref.time,
-          ref.service,
-          ref.traceId,
-          ref.spanId,
-          ref.series?.name,
-          ...Object.values(ref.series?.labels ?? {}),
-        ];
-        for (const q of quoted) if (q !== undefined) expect(text).toContain(q);
-      }
+    expect((await http(uiPort, 'GET', '/api/settings')).json()).toMatchObject({ provider: 'fake' });
+    const runs = (await http(uiPort, 'GET', '/api/runs')).json().runs;
+    const byId = new Map(runs.map((r) => [r.id, r]));
+    for (const id of [fakeRunId, ollamaRunId]) expect(byId.get(id)).toMatchObject({ ok: true });
+    const providers = await Promise.all(
+      [fakeRunId, ollamaRunId].map(async (id) => {
+        const r = readInvestigationResult(
+          (await http(uiPort, 'GET', `/api/runs/${id}`)).json().result,
+        );
+        return r.ok ? r.result.run.provider : null;
+      }),
+    );
+    expect(providers).toEqual(['fake', 'ollama']);
   });
 
   it('shuts down cleanly and leaves no listener behind', async () => {

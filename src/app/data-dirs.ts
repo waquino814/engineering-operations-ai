@@ -23,6 +23,7 @@ export function withDataDefaults(env: AppEnv, home: string): AppEnv {
     ...env,
     EOAI_BUNDLES_DIR: env['EOAI_BUNDLES_DIR'] || join(root, 'bundles'),
     EOAI_RUNS_DIR: env['EOAI_RUNS_DIR'] || join(root, 'runs'),
+    EOAI_SETTINGS_FILE: env['EOAI_SETTINGS_FILE'] || join(root, 'settings.json'),
   };
 }
 

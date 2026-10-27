@@ -1,4 +1,4 @@
-import { EmptyState, ErrorState, Loading, OriginTag, StatusBadge } from '../components.tsx';
+import { EmptyState, ErrorState, Loading, ProviderBadge, StatusBadge } from '../components.tsx';
 import type { InvestigationDataSource } from '../data/types.ts';
 import {
   affectedComponents,
@@ -54,7 +54,7 @@ export function Overview({ source }: { source: InvestigationDataSource }) {
                   Tokens charged
                 </th>
                 <th scope="col">Started</th>
-                <th scope="col">Source</th>
+                <th scope="col">Produced by</th>
               </tr>
             </thead>
             <tbody>
@@ -89,7 +89,10 @@ export function Overview({ source }: { source: InvestigationDataSource }) {
                     <td className="num">{formatNumber(inv.result.run.usage.chargedTokens)}</td>
                     <td className="nowrap">{formatTime(inv.result.run.startedAt)}</td>
                     <td>
-                      <OriginTag origin={inv.origin} />
+                      <ProviderBadge
+                        provider={inv.result.run.provider}
+                        model={inv.result.run.model}
+                      />
                     </td>
                   </tr>
                 );

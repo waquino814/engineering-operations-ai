@@ -2,7 +2,11 @@ import { cleanup, render } from '@testing-library/react';
 import { afterEach } from 'vitest';
 import { App } from '../../src/ui/App.tsx';
 import { createFixtureSource } from '../../src/ui/data/fixture-source.ts';
-import type { InvestigationDataSource, UiFixtures } from '../../src/ui/data/types.ts';
+import type {
+  InvestigationDataSource,
+  ProviderStatus,
+  UiFixtures,
+} from '../../src/ui/data/types.ts';
 import committed from '../../src/ui/fixtures/fixtures.json' with { type: 'json' };
 
 /** Shared helpers for the console tests (jsdom). */
@@ -42,3 +46,15 @@ export const investigation = (id: string) => {
   if (!found) throw new Error(`no fixture ${id}`);
   return found;
 };
+
+/** A provider status with every field, for tests that change only some. */
+export const providerStatus = (over: Partial<ProviderStatus> = {}): ProviderStatus => ({
+  selected: 'fake',
+  pinned: false,
+  runnable: true,
+  simulated: true,
+  model: 'simulated-deterministic-v1',
+  models: [],
+  reason: null,
+  ...over,
+});

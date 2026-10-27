@@ -24,8 +24,8 @@ describe('the investigations overview', () => {
     expect(text.join('\n')).toContain('Inconclusive');
     expect(text.join('\n')).toContain('Budget exceeded');
     expect(text.join('\n')).toContain('provider_unavailable');
-    // Every row is marked as fixture data.
-    expect(rows.every((r) => r.textContent.includes('Fixture'))).toBe(true);
+    // Every row says who produced it: the fixtures were made by the fake provider.
+    expect(rows.every((r) => r.textContent.includes('Simulated'))).toBe(true);
     // Each incident links to its detail page.
     expect(
       within(rows[0] as HTMLElement)

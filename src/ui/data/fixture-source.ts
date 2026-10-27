@@ -37,7 +37,19 @@ export function createFixtureSource(fixtures: UiFixtures): InvestigationDataSour
   return {
     description: { mode: 'fixture', notice: fixtures.notice },
     // Starting answers "unavailable" with its reason and the precomputed runs, so it is offered.
-    getProviderStatus: () => Promise.resolve({ provider: 'fixture', runnable: true, reason: null }),
+    getProviderStatus: () =>
+      Promise.resolve({
+        selected: 'fixture',
+        pinned: true,
+        runnable: true,
+        simulated: false,
+        model: null,
+        models: [],
+        reason: null,
+      }),
+    getSettings: () => Promise.resolve({ provider: 'fake', ollamaModel: null, pinned: true }),
+    saveSettings: () =>
+      Promise.reject(new Error('Settings cannot be saved while the console shows fixtures.')),
     listInvestigations: () =>
       Promise.resolve(
         [...investigations].sort((a, b) =>

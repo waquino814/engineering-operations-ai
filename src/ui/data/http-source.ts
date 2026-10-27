@@ -5,6 +5,7 @@ import type {
   BundleValidation,
   InvestigationDataSource,
   InvestigationRecord,
+  ProviderSettings,
   StartOutcome,
   Unavailable,
 } from './types.ts';
@@ -22,6 +23,16 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.code = code;
   }
+}
+
+function parseSettings(b: Json): ProviderSettings {
+  if (
+    (b['provider'] !== 'fake' && b['provider'] !== 'ollama') ||
+    (b['ollamaModel'] !== null && typeof b['ollamaModel'] !== 'string') ||
+    typeof b['pinned'] !== 'boolean'
+  )
+    throw new ApiError('The settings response is malformed.');
+  return { provider: b['provider'], ollamaModel: b['ollamaModel'], pinned: b['pinned'] };
 }
 
 const GATEWAY_STATUSES = new Set([502, 503, 504]);
@@ -96,17 +107,45 @@ export function createHttpSource(
     description: {
       mode: 'local',
       notice:
-        'Connected to the local application on this machine. It runs no hosted model; a run needs a provider the application permits.',
+        'Connected to the local application on this machine. It never calls a hosted model: runs are simulated (fake) or use a verified local Ollama model.',
     },
     async getProviderStatus() {
-      const body = await ok('/api/status');
+      const b = await ok('/api/status');
       if (
-        typeof body['provider'] !== 'string' ||
-        typeof body['runnable'] !== 'boolean' ||
-        (body['reason'] !== null && typeof body['reason'] !== 'string')
+        (b['selected'] !== 'fake' && b['selected'] !== 'ollama') ||
+        typeof b['pinned'] !== 'boolean' ||
+        typeof b['runnable'] !== 'boolean' ||
+        typeof b['simulated'] !== 'boolean' ||
+        (b['model'] !== null && typeof b['model'] !== 'string') ||
+        !Array.isArray(b['models']) ||
+        !b['models'].every((m) => typeof m === 'string') ||
+        (b['reason'] !== null && typeof b['reason'] !== 'string')
       )
         throw new ApiError('The status response is malformed.');
-      return { provider: body['provider'], runnable: body['runnable'], reason: body['reason'] };
+      return {
+        selected: b['selected'],
+        pinned: b['pinned'],
+        runnable: b['runnable'],
+        simulated: b['simulated'],
+        model: b['model'],
+        models: b['models'],
+        reason: b['reason'],
+      };
+    },
+    async getSettings() {
+      return parseSettings(await ok('/api/settings'));
+    },
+    async saveSettings(input) {
+      const { status, body } = await call('/api/settings', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+      if (status !== 200) {
+        const e = errorOf(body);
+        throw new ApiError(e.message, e.code);
+      }
+      return parseSettings(body);
     },
     async listInvestigations() {
       const body = await ok('/api/runs');

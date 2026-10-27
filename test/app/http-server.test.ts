@@ -12,11 +12,12 @@ import {
 } from '../../src/app/http-server.ts';
 import { ProviderPolicyError } from '../../src/app/provider-gate.ts';
 import { readInvestigationResult } from '../../src/investigation/result.ts';
-import { tempDir, workspace } from './support.ts';
+import { ollamaStub, tempDir, workspace } from './support.ts';
 
 /** The fields of the server's JSON bodies that the tests read. */
 interface Doc {
   error: { code: string; message: string };
+  [key: string]: unknown;
   runs: unknown;
   bundles: unknown;
   result: unknown;
@@ -236,7 +237,8 @@ describe('request validation', () => {
         { bundleId: 'x' },
         { origin: `http://127.0.0.1:${String(server.port)}` },
       );
-      expect(own.status).toBe(409);
+      // Past the origin check; the bundle does not exist.
+      expect(own.status).toBe(404);
     } finally {
       await server.close();
     }
@@ -284,26 +286,141 @@ describe('request validation', () => {
   });
 });
 
-describe('status', () => {
-  it('says plainly whether a run can start, without paths or settings', async () => {
-    const none = await serve({ steps: 'none' });
+describe('status and settings', () => {
+  it('keeps the selection and its readiness apart, without paths or secrets', async () => {
+    const { w, server } = await serve({ steps: 'none' });
     try {
-      const r = await call(none.server, 'GET', '/api/status');
+      const r = await call(server, 'GET', '/api/status');
       expect(r.status).toBe(200);
-      expect(r.json()).toMatchObject({ provider: 'fake', runnable: false });
-      expect(r.text).toContain('Nothing was run');
-      expect(r.text).not.toContain(none.w.bundlesDir);
-      expect((await call(none.server, 'POST', '/api/status')).status).toBe(405);
+      expect(r.json()).toMatchObject({
+        selected: 'fake',
+        pinned: false,
+        runnable: true,
+        simulated: true,
+        reason: null,
+      });
+      expect(r.text).not.toContain(w.bundlesDir);
+      expect((await call(server, 'POST', '/api/status')).status).toBe(405);
     } finally {
-      await none.server.close();
+      await server.close();
     }
-    const some = await serve();
+  });
+
+  it('saves a valid selection, validates it on the server, and keeps it across a restart', async () => {
+    const w = await workspace();
+    const stub = ollamaStub({ models: [{ name: 'tiny:1b' }] });
+    const start = () =>
+      startServer({ env: w.env(), port: 0, appDeps: { ollamaFetch: stub.fetch } });
+    let server = await start();
     try {
-      expect((await call(some.server, 'GET', '/api/status')).text).toBe(
-        '{"provider":"fake","runnable":true,"reason":null}',
+      expect((await call(server, 'GET', '/api/settings')).json()).toMatchObject({
+        provider: 'fake',
+        ollamaModel: null,
+        pinned: false,
+      });
+      const put = (body: string, headers: Record<string, string> = {}) =>
+        call(server, 'PUT', '/api/settings', {
+          body,
+          headers: { 'content-type': 'application/json', ...headers },
+        });
+      for (const bad of [
+        '{oops',
+        '{}',
+        '[]',
+        '{"provider":"anthropic"}',
+        '{"provider":"local"}',
+        '{"provider":"Fake"}',
+        '{"provider":"fake","extra":1}',
+        '{"provider":"ollama","ollamaModel":"x-cloud"}',
+        '{"provider":"ollama","ollamaModel":"../../etc"}',
+        '{"provider":"ollama","ollamaModel":7}',
+      ])
+        expect([bad, (await put(bad)).status]).toEqual([bad, 400]);
+      expect((await put('{"provider":"fake"}', { origin: 'http://evil.example' })).status).toBe(
+        403,
       );
+      expect(
+        (
+          await call(server, 'PUT', '/api/settings', {
+            body: '{"provider":"fake"}',
+            headers: { 'content-type': 'text/plain' },
+          })
+        ).status,
+      ).toBe(415);
+      // Nothing invalid was stored.
+      expect((await call(server, 'GET', '/api/settings')).json()).toMatchObject({
+        provider: 'fake',
+      });
+
+      const saved = await put('{"provider":"ollama","ollamaModel":null}');
+      expect(saved.status).toBe(200);
+      expect(saved.json()).toMatchObject({ provider: 'ollama', ollamaModel: null, pinned: false });
+      expect((await call(server, 'GET', '/api/status')).json()).toMatchObject({
+        selected: 'ollama',
+        runnable: true,
+        simulated: false,
+        model: 'tiny:1b',
+        models: ['tiny:1b'],
+      });
+      await server.close();
+      server = await start();
+      expect((await call(server, 'GET', '/api/settings')).json()).toMatchObject({
+        provider: 'ollama',
+      });
+      const file = await readFile(join(w.runsDir, '..', 'settings.json'), 'utf8');
+      expect(JSON.parse(file)).toEqual({ version: 1, provider: 'ollama', ollamaModel: null });
     } finally {
-      await some.server.close();
+      await server.close();
+    }
+  });
+
+  it('selecting Ollama while it is unavailable is saved, and then reported as blocked', async () => {
+    const w = await workspace();
+    const server = await startServer({
+      env: w.env(),
+      port: 0,
+      appDeps: { ollamaFetch: ollamaStub({ down: true }).fetch },
+    });
+    try {
+      const put = await call(server, 'PUT', '/api/settings', {
+        body: '{"provider":"ollama"}',
+        headers: { 'content-type': 'application/json' },
+      });
+      expect(put.status).toBe(200);
+      const status = (await call(server, 'GET', '/api/status')).json();
+      expect(status).toMatchObject({ selected: 'ollama', runnable: false });
+      expect(String(status['reason'])).toContain('not reachable');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('cannot change a provider that the environment pins, and reports a damaged file', async () => {
+    const w = await workspace();
+    const pinned = await startServer({ env: w.env({ EOAI_MODEL_PROVIDER: 'fake' }), port: 0 });
+    try {
+      const r = await call(pinned, 'PUT', '/api/settings', {
+        body: '{"provider":"ollama"}',
+        headers: { 'content-type': 'application/json' },
+      });
+      expect([r.status, r.json().error.code]).toEqual([409, 'provider_pinned']);
+      expect((await call(pinned, 'GET', '/api/settings')).json()).toMatchObject({ pinned: true });
+    } finally {
+      await pinned.close();
+    }
+    await writeFile(join(w.runsDir, '..', 'settings.json'), '{"secret":"hunter2"}');
+    const server = await startServer({ env: w.env(), port: 0 });
+    try {
+      for (const path of ['/api/settings', '/api/status']) {
+        const r = await call(server, 'GET', path);
+        expect([r.status, r.json().error.code]).toEqual([500, 'settings_unreadable']);
+        expect(r.text).not.toContain('hunter2');
+      }
+      const run = await post(server, { bundleId: 'x' });
+      expect(run.status).toBe(409);
+      expect(run.json().error.code).toBe('provider_blocked');
+    } finally {
+      await server.close();
     }
   });
 });
@@ -328,15 +445,88 @@ describe('investigations', () => {
     }
   });
 
-  it('answers with a stable error, and runs nothing, when no provider is runnable', async () => {
-    const { w, server } = await serve({ steps: 'none' });
+  it('answers with a stable error, and runs nothing, when the selected provider is blocked', async () => {
+    const w = await workspace();
+    const server = await startServer({
+      env: w.env({ EOAI_MODEL_PROVIDER: 'ollama' }),
+      port: 0,
+      appDeps: { ollamaFetch: ollamaStub({ down: true }).fetch },
+    });
     try {
       const r = await post(server, { bundleId: w.excerptId });
       expect(r.status).toBe(409);
-      expect(r.json().error.code).toBe('no_runnable_provider');
+      expect(r.json().error.code).toBe('provider_blocked');
       expect(r.json().error.message).toContain('Nothing was run');
       expect(r.json()).not.toHaveProperty('runId');
+      // No silent fallback: nothing was stored, from any provider.
       await expect(readFile(w.runsDir)).rejects.toThrow();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('runs the simulated provider when Fake is selected, and labels the stored result', async () => {
+    const w = await workspace();
+    const server = await startServer({ env: w.env(), port: 0 });
+    try {
+      const started = await post(server, { bundleId: w.excerptId });
+      expect(started.status).toBe(201);
+      const got = (await call(server, 'GET', `/api/runs/${started.json().runId}`)).json();
+      const result = readInvestigationResult(got.result);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.result.run).toMatchObject({
+        provider: 'fake',
+        model: 'simulated-deterministic-v1',
+      });
+      expect(result.result.limitations.join(' ')).toContain('SIMULATED');
+      expect(result.result.findings.every((f) => f.statement.startsWith('SIMULATED'))).toBe(true);
+      // Never claims a root cause: it is not an investigator.
+      expect(result.result.findings.map((f) => f.kind)).toEqual(['symptom']);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('cancels a run when the client goes away, and stores it as cancelled', async () => {
+    const w = await workspace();
+    const server = await startServer({
+      env: w.env(),
+      port: 0,
+      appDeps: { fakeSteps: [{ hang: true }] },
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = request(
+          {
+            host: server.host,
+            port: server.port,
+            method: 'POST',
+            path: '/api/investigations',
+            headers: {
+              host: `127.0.0.1:${String(server.port)}`,
+              'content-type': 'application/json',
+            },
+          },
+          () => {
+            reject(new Error('the run should not have answered'));
+          },
+        );
+        req.on('error', () => undefined);
+        req.end(JSON.stringify({ bundleId: w.excerptId }));
+        setTimeout(() => {
+          req.destroy();
+          resolve();
+        }, 400);
+      });
+      let runs: { ok: boolean; summary?: { outcome: string; failureClass: string } }[] = [];
+      for (let i = 0; i < 100 && runs.length === 0; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        runs = (await call(server, 'GET', '/api/runs')).json().runs as typeof runs;
+      }
+      expect(runs[0]?.summary).toMatchObject({ outcome: 'failed', failureClass: 'cancelled' });
+      // The server is free again.
+      expect((await post(server, { bundleId: 'x' })).status).not.toBe(429);
     } finally {
       await server.close();
     }

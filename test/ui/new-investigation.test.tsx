@@ -2,7 +2,7 @@
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { BundleOption, BundleValidation } from '../../src/ui/data/types.ts';
-import { deferred, renderAt, sourceWith } from './support.tsx';
+import { deferred, providerStatus, renderAt, sourceWith } from './support.tsx';
 
 /** Screen B: choose or upload, validate, then start only from a valid bundle. */
 const panel = (name: string) => screen.getByRole('region', { name });
@@ -126,7 +126,8 @@ describe('starting and uploading', () => {
     await choose('Fixture bundle A');
     await within(panel('2. Validation')).findByText(/^Valid/);
     fireEvent.click(within(panel('3. Start')).getByRole('button', { name: 'Start investigation' }));
-    const notice = await within(panel('3. Start')).findByRole('status');
+    const notice = (await within(panel('3. Start')).findByText(/Starting an investigation/))
+      .parentElement as HTMLElement;
     expect(notice.textContent).toContain('Starting an investigation');
     expect(notice.textContent).toContain('application/API boundary planned for milestone E6');
     expect(
@@ -168,15 +169,18 @@ describe('starting and uploading', () => {
     renderAt(
       '#/new',
       sourceWith({
-        getProviderStatus: () => Promise.resolve({ provider: 'fake', runnable: false, reason }),
+        getProviderStatus: () =>
+          Promise.resolve(
+            providerStatus({ selected: 'ollama', runnable: false, simulated: false, reason }),
+          ),
         startInvestigation: start,
       }),
     );
     await choose('Fixture bundle A');
     await within(panel('2. Validation')).findByText(/^Valid/);
-    const notice = await within(panel('3. Start')).findByText(/No investigation can run/);
+    const notice = await within(panel('3. Start')).findByText(/The selected provider cannot run/);
     expect(notice.parentElement?.textContent).toContain(reason);
-    expect(panel('3. Start').textContent).toContain('never fabricates findings');
+    expect(panel('3. Start').textContent).toContain('never falls back');
     const button = within(panel('3. Start')).getByRole('button', { name: 'Start investigation' });
     expect(button).toHaveProperty('disabled', true);
     fireEvent.click(button);
@@ -196,6 +200,34 @@ describe('starting and uploading', () => {
     expect(
       within(panel('3. Start')).getByRole('button', { name: 'Start investigation' }),
     ).toHaveProperty('disabled', true);
+  });
+
+  it('says a Fake run is simulated, and shows that it is running until it answers', async () => {
+    const answer = deferred<{ status: 'started'; investigationId: string }>();
+    renderAt(
+      '#/new',
+      sourceWith({
+        getProviderStatus: () => Promise.resolve(providerStatus()),
+        startInvestigation: () => answer.promise,
+      }),
+    );
+    await choose('Fixture bundle A');
+    await within(panel('2. Validation')).findByText(/^Valid/);
+    expect(
+      await within(panel('3. Start')).findByText(/placeholder, not an AI investigation/),
+    ).toBeDefined();
+    fireEvent.click(within(panel('3. Start')).getByRole('button', { name: 'Start investigation' }));
+    const running = await within(panel('3. Start')).findByRole('button', { name: 'Running…' });
+    expect(running).toHaveProperty('disabled', true);
+    expect(panel('3. Start').textContent).toContain('can take several minutes');
+    await act(async () => {
+      answer.resolve({ status: 'started', investigationId: 'run-7' });
+      await answer.promise;
+    });
+    expect(await within(panel('3. Start')).findByRole('link', { name: 'run-7' })).toBeDefined();
+    expect(
+      within(panel('3. Start')).getByRole('button', { name: 'Start investigation' }),
+    ).toHaveProperty('disabled', false);
   });
 
   it('shows a failed start as an alert and never as a started investigation', async () => {

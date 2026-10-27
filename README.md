@@ -12,7 +12,7 @@ Its first evidence source is [Commerce Platform](https://github.com/waquino814/c
 - **The investigation workflow** (E2 foundation) runs end to end against a deterministic fake model: admission, blinding, evidence selection, one bounded model request, strict output validation, evidence-reference verification, bounded repair and retries, and a schema-checked result. **No real model provider is integrated**, so no real diagnosis has been produced.
 - **The evaluation harness** (E3 foundation) scores results against the ground truth behind a separate boundary, checks every model request for answer leaks, and produces a deterministic report from eight synthetic cases ([docs/evaluation.md](docs/evaluation.md)).
 - Their decisions, [ADRs 0006 to 0009](docs/adr/README.md), are **proposed**, not approved. [ADR 0010](docs/adr/0010-investigation-result-contract-v0.md), the result contract's states and versioning with its amendment to ADR 0004, was **accepted** on 2026-10-26.
-- **The investigation console** (E4, complete) shows investigations, a bundle validation workflow and each result's findings, evidence, verification, limitations, diagnostics and token usage. It reads the **local application** over its loopback HTTP API (ADR 0012), or **fixture data** when built with `VITE_EOAI_SOURCE=fixture`. No provider is runnable yet, so starting an investigation says so and runs nothing; uploads are not supported. Its stack, React 19, Vite and plain CSS, is [ADR 0011](docs/adr/0011-investigation-ui-stack.md), accepted on 2026-10-26. Provider integration (E5) and live end-to-end runs (E6) come after it.
+- **The investigation console** (E4, complete) shows investigations, a bundle validation workflow and each result's findings, evidence, verification, limitations, diagnostics and token usage. It reads the **local application** over its loopback HTTP API (ADR 0012), or **fixture data** when built with `VITE_EOAI_SOURCE=fixture`. Settings chooses the provider, `Fake` (deterministic, labelled simulated output) or `Ollama` (your installed local model, checked as local-only before any prompt); the choice is saved and kept across restarts. Uploads are not supported. Its stack, React 19, Vite and plain CSS, is [ADR 0011](docs/adr/0011-investigation-ui-stack.md), accepted on 2026-10-26. Provider integration (E5) and live end-to-end runs (E6) come after it.
 
 TypeScript on Node.js 24, with pnpm ([ADR 0001](docs/adr/0001-runtime-and-language.md)):
 
@@ -24,7 +24,8 @@ pnpm eval:synthetic                     # synthetic evaluation report; exit 1 on
 pnpm dev                                # application (loopback :8787) + console (:5173); data in ~/.engineering-operations-ai
 pnpm demo:seed                          # copy the synthetic bundles into the bundles directory (never overwrites)
 pnpm serve                              # the application alone (EOAI_PORT, EOAI_DATA_DIR, EOAI_BUNDLES_DIR, EOAI_RUNS_DIR override)
-pnpm ui:dev                             # the console's dev server alone (proxies /api to the application)
+pnpm ui:dev [--port n]                  # same as pnpm dev (it also starts the application); --port sets the console's port
+pnpm ui:vite                            # Vite alone (proxies /api to an application you started yourself)
 pnpm ui:build                           # build the console into dist/ui/
 pnpm fixtures:ui                        # regenerate the console's fixtures from the pipeline
 ```

@@ -8,9 +8,6 @@ import { ProviderError } from '../../src/investigation/provider.ts';
 import { readInvestigationResult } from '../../src/investigation/result.ts';
 import { fetchSpy, tempDir, workspace } from './support.ts';
 
-const provider = (app: ReturnType<typeof createApplication>) =>
-  app.config.provider.provider as FakeProvider;
-
 describe('the application', () => {
   it('investigates a valid bundle, stores the validated result and reads it back', async () => {
     const w = await workspace();
@@ -64,14 +61,15 @@ describe('the application', () => {
 
   it('never calls the provider for an invalid bundle', async () => {
     const w = await workspace();
-    const app = createApplication(w.env(), { fakeSteps: w.steps });
+    const fake = new FakeProvider(w.steps);
+    const app = createApplication(w.env(), { fakeProvider: fake });
     const out = await app.startInvestigation(w.tamperedId);
     expect(out).toMatchObject({
       status: 'done',
       result: { outcome: 'failed', failure: { class: 'invalid_bundle' } },
     });
-    expect(provider(app).requests).toHaveLength(0);
-    expect(provider(app).remaining).toBe(1);
+    expect(fake.requests).toHaveLength(0);
+    expect(fake.remaining).toBe(1);
   });
 
   it('rejects bundle ids that could leave the bundles root, before any provider call', async () => {
@@ -79,7 +77,8 @@ describe('the application', () => {
     const outside = await tempDir();
     await symlink(outside, join(w.bundlesDir, 'link-out'));
     await writeFile(join(w.bundlesDir, 'afile'), 'x');
-    const app = createApplication(w.env(), { fakeSteps: w.steps });
+    const fake = new FakeProvider(w.steps);
+    const app = createApplication(w.env(), { fakeProvider: fake });
     for (const id of ['..', '../x', 'a/b', '.hidden', '', '/etc', 'x\0y'])
       expect(await app.startInvestigation(id)).toEqual({
         status: 'error',
@@ -90,7 +89,7 @@ describe('the application', () => {
         status: 'error',
         reason: 'bundle_not_found',
       });
-    expect(provider(app).requests).toHaveLength(0);
+    expect(fake.requests).toHaveLength(0);
   });
 
   it('lists bundle directories only, and validates one for the operator', async () => {

@@ -7,7 +7,7 @@ import {
   mapMessage,
   mapUsage,
 } from '../../src/providers/anthropic/mapping.ts';
-import { toWireSchema } from '../../src/providers/anthropic/wire-schema.ts';
+import { toWireSchema } from '../../src/providers/wire-schema.ts';
 
 const UNSUPPORTED = ['minLength', 'maxLength', 'minimum', 'maxItems', 'prefixItems', '$id'];
 

@@ -4,7 +4,7 @@ import {
   type ModelRequest,
   type UsageReport,
 } from '../../investigation/provider.ts';
-import { toWireSchema } from './wire-schema.ts';
+import { toWireSchema } from '../wire-schema.ts';
 
 /**
  * Pure mapping between the provider-neutral port and the Anthropic Messages API (ADR 0008). It

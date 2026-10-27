@@ -1,6 +1,6 @@
-import { isAbsolute, resolve } from 'node:path';
-import { gateProvider, type AppEnv, type GatedProvider } from './provider-gate.ts';
-import type { FakeStep } from '../investigation/fake-provider.ts';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { OllamaEndpointError, resolveOllamaEndpoint } from '../providers/ollama/client.ts';
+import { pinnedProvider, type AppEnv, type ProviderName } from './provider-gate.ts';
 
 export class AppConfigError extends Error {
   readonly problems: string[];
@@ -13,9 +13,13 @@ export class AppConfigError extends Error {
 }
 
 export interface AppConfig {
-  provider: GatedProvider;
   bundlesDir: string;
   runsDir: string;
+  settingsFile: string;
+  /** Set by EOAI_MODEL_PROVIDER; the Settings page cannot change it. */
+  pinned: ProviderName | null;
+  /** A validated loopback endpoint; Ollama is not contacted until a status check or a run. */
+  ollamaUrl: URL;
 }
 
 function directory(env: AppEnv, name: string, problems: string[]): string {
@@ -31,11 +35,25 @@ function directory(env: AppEnv, name: string, problems: string[]): string {
  * Validates the whole configuration without touching the filesystem or any provider. The
  * provider policy is checked first, so a refused provider is reported before anything else.
  */
-export function loadConfig(env: AppEnv, options: { fakeSteps?: FakeStep[] } = {}): AppConfig {
-  const provider = gateProvider(env, options);
+export function loadConfig(env: AppEnv): AppConfig {
+  const pinned = pinnedProvider(env);
   const problems: string[] = [];
   const bundlesDir = directory(env, 'EOAI_BUNDLES_DIR', problems);
   const runsDir = directory(env, 'EOAI_RUNS_DIR', problems);
+  const explicit = env['EOAI_SETTINGS_FILE']?.trim();
+  const settingsFile =
+    explicit === undefined || explicit === ''
+      ? runsDir === ''
+        ? ''
+        : join(dirname(runsDir), 'settings.json')
+      : directory(env, 'EOAI_SETTINGS_FILE', problems);
+  let ollamaUrl = new URL('http://127.0.0.1:11434/');
+  try {
+    ollamaUrl = resolveOllamaEndpoint(env['EOAI_OLLAMA_URL']);
+  } catch (e) {
+    if (!(e instanceof OllamaEndpointError)) throw e;
+    problems.push('EOAI_OLLAMA_URL must be http on a loopback address');
+  }
   if (problems.length > 0) throw new AppConfigError(problems);
-  return { provider, bundlesDir, runsDir };
+  return { bundlesDir, runsDir, settingsFile, pinned, ollamaUrl };
 }

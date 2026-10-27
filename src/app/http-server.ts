@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, join } from 'node:path';
 import { createApplication, type AppDeps, type Application } from './application.ts';
 import { ensureDataDirs } from './data-dirs.ts';
+import { SettingsError } from './settings.ts';
 import type { AppEnv } from './provider-gate.ts';
 
 /**
@@ -79,10 +80,10 @@ const ERRORS: Record<string, [number, string]> = {
   unsupported_media_type: [415, 'send application/json'],
   payload_too_large: [413, 'the request body is too large'],
   forbidden: [403, 'the request was refused'],
-  no_runnable_provider: [
-    409,
-    'no runnable provider is configured; the fake provider has no scripted replies and the local provider is blocked. Nothing was run.',
-  ],
+  // The message of a blocked provider is dynamic (it says why); see `fail`'s override.
+  provider_blocked: [409, 'the selected provider cannot run. Nothing was run.'],
+  provider_pinned: [409, 'the provider is fixed by EOAI_MODEL_PROVIDER and cannot be changed here'],
+  settings_unreadable: [500, 'the settings file could not be read or is not valid'],
   busy: [429, 'an investigation is already running'],
   run_unreadable: [500, 'the stored run could not be read'],
   internal_error: [500, 'unexpected error'],
@@ -101,10 +102,47 @@ function send(res: ServerResponse, status: number, body: Json | string, type?: s
   return true;
 }
 
-function fail(res: ServerResponse, code: string, extra: Record<string, string> = {}): true {
-  const [status, message] = ERRORS[code] ?? [500, 'unexpected error'];
-  res.setHeader('allow', extra['allow'] ?? 'GET, POST');
-  return send(res, status, { error: { code, message } });
+function fail(
+  res: ServerResponse,
+  code: string,
+  extra: Record<string, string> = {},
+  message?: string,
+): true {
+  const [status, fixed] = ERRORS[code] ?? [500, 'unexpected error'];
+  res.setHeader('allow', extra['allow'] ?? 'GET, POST, PUT');
+  return send(res, status, { error: { code, message: message ?? fixed } });
+}
+
+/**
+ * The checks every state-changing request passes: this server's own origin, JSON content, a
+ * bounded body that parses. On failure it has already answered and returns null.
+ */
+async function jsonBody(
+  req: IncomingMessage,
+  res: ServerResponse,
+  allowedHosts: Set<string>,
+): Promise<{ value: unknown } | null> {
+  // A browser page from another origin cannot change anything.
+  const origin = req.headers.origin;
+  if (origin !== undefined && ![...allowedHosts].some((h) => origin === `http://${h}`)) {
+    fail(res, 'forbidden');
+    return null;
+  }
+  if (!/^application\/json(\s*;.*)?$/i.test(req.headers['content-type'] ?? '')) {
+    fail(res, 'unsupported_media_type');
+    return null;
+  }
+  const raw = await readBody(req);
+  if (raw === null) {
+    fail(res, 'payload_too_large');
+    return null;
+  }
+  try {
+    return { value: JSON.parse(raw.toString('utf8')) as unknown };
+  } catch {
+    fail(res, 'bad_request');
+    return null;
+  }
 }
 
 /** A malformed percent-escape becomes an id no route accepts, not an error. */
@@ -181,7 +219,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       return fail(res, 'bad_request');
     }
     const method = req.method ?? '';
-    if (method !== 'GET' && method !== 'POST') return fail(res, 'method_not_allowed');
+    if (method !== 'GET' && method !== 'POST' && method !== 'PUT')
+      return fail(res, 'method_not_allowed');
     if (path !== '/healthz' && !path.startsWith('/api/')) {
       if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
       const asset = assets.get(path);
@@ -195,13 +234,29 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     }
     if (path === '/api/status') {
       if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
-      // What the console needs to be honest about starting a run; no path or setting is included.
-      const { name, runnable } = app.config.provider;
-      return send(res, 200, {
-        provider: name,
-        runnable,
-        reason: runnable ? null : ERRORS['no_runnable_provider']?.[1],
-      });
+      // What the console needs to be honest about a run: the selection and its readiness, apart.
+      try {
+        return send(res, 200, { ...(await app.getProviderStatus()) });
+      } catch (e) {
+        if (e instanceof SettingsError) return fail(res, 'settings_unreadable');
+        throw e;
+      }
+    }
+    if (path === '/api/settings') {
+      if (method === 'GET') {
+        try {
+          return send(res, 200, { ...(await app.getSettings()) });
+        } catch (e) {
+          if (e instanceof SettingsError) return fail(res, 'settings_unreadable');
+          throw e;
+        }
+      }
+      if (method !== 'PUT') return fail(res, 'method_not_allowed', { allow: 'GET, PUT' });
+      const body = await jsonBody(req, res, allowedHosts);
+      if (body === null) return true;
+      const out = await app.updateSettings(body.value);
+      if (out.status === 'saved') return send(res, 200, { ...out.settings, pinned: false });
+      return fail(res, out.status === 'pinned' ? 'provider_pinned' : 'bad_request');
     }
     if (path === '/api/runs') {
       if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
@@ -226,30 +281,25 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     }
     if (path === '/api/investigations') {
       if (method !== 'POST') return fail(res, 'method_not_allowed', { allow: 'POST' });
-      // A browser page from another origin cannot start a run.
-      const origin = req.headers.origin;
-      if (origin !== undefined && ![...allowedHosts].some((h) => origin === `http://${h}`))
-        return fail(res, 'forbidden');
-      if (!/^application\/json(\s*;.*)?$/i.test(req.headers['content-type'] ?? ''))
-        return fail(res, 'unsupported_media_type');
-      const raw = await readBody(req);
-      if (raw === null) return fail(res, 'payload_too_large');
-      let body: unknown;
-      try {
-        body = JSON.parse(raw.toString('utf8'));
-      } catch {
-        return fail(res, 'bad_request');
-      }
+      const body = await jsonBody(req, res, allowedHosts);
+      if (body === null) return true;
       const keys =
-        typeof body === 'object' && body !== null && !Array.isArray(body) ? Object.keys(body) : [];
-      const bundleId = (body as Json | null)?.['bundleId'];
+        typeof body.value === 'object' && body.value !== null && !Array.isArray(body.value)
+          ? Object.keys(body.value)
+          : [];
+      const bundleId = (body.value as Json | null)?.['bundleId'];
       if (keys.length !== 1 || keys[0] !== 'bundleId' || typeof bundleId !== 'string')
         return fail(res, 'bad_request');
       if (running) return fail(res, 'busy');
       running = true;
+      // A client that goes away cancels its run; the result is stored as cancelled.
+      const cancel = new AbortController();
+      res.once('close', () => {
+        if (!res.writableEnded) cancel.abort();
+      });
       try {
-        const out = await app.startInvestigation(bundleId);
-        if (out.status === 'refused') return fail(res, out.reason);
+        const out = await app.startInvestigation(bundleId, { signal: cancel.signal });
+        if (out.status === 'refused') return fail(res, out.reason, {}, out.message);
         if (out.status === 'error') return fail(res, out.reason);
         return send(res, 201, { runId: out.runId, outcome: out.result.outcome });
       } finally {

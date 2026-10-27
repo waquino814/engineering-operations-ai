@@ -2,7 +2,7 @@ import { request } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { main } from '../../src/cli.ts';
 import { ProviderError } from '../../src/investigation/provider.ts';
-import { fetchSpy, workspace } from './support.ts';
+import { fetchSpy, ollamaStub, workspace } from './support.ts';
 
 function streams() {
   let out = '';
@@ -55,11 +55,30 @@ describe('cli investigate', () => {
     ).toBe(1);
   });
 
-  it('exits 2 without running when the fake provider has nothing scripted', async () => {
+  it('runs the simulated provider by default and says so in the stored result', async () => {
     const w = await workspace();
     const s = streams();
-    expect(await main(['investigate', w.excerptId], s.out, s.err, w.env())).toBe(2);
-    expect(s.text().err).toContain('no runnable provider');
+    expect(await main(['investigate', w.excerptId, '--json'], s.out, s.err, w.env())).toBe(0);
+    const result = JSON.parse(s.text().out) as {
+      run: { provider: string; model: string };
+      limitations: string[];
+    };
+    expect(result.run).toMatchObject({ provider: 'fake', model: 'simulated-deterministic-v1' });
+    expect(result.limitations.join(' ')).toContain('SIMULATED');
+  });
+
+  it('exits 2 with the reason, and stores nothing, when Ollama is selected and unavailable', async () => {
+    const w = await workspace();
+    const s = streams();
+    const code = await main(
+      ['investigate', w.excerptId],
+      s.out,
+      s.err,
+      w.env({ EOAI_MODEL_PROVIDER: 'ollama' }),
+      { ollamaFetch: ollamaStub({ down: true }).fetch },
+    );
+    expect(code).toBe(2);
+    expect(s.text().err).toContain('Nothing was run');
     expect(s.text().out).toBe('');
   });
 
@@ -152,6 +171,7 @@ describe('cli serve', () => {
     [['serve', '--bogus', 'x'], {}],
     [['serve'], { EOAI_MODEL_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: 'sk-ant-secret' }],
     [['serve'], { EOAI_MODEL_PROVIDER: 'local' }],
+    [['serve'], { EOAI_MODEL_PROVIDER: 'anthropic' }],
   ])('exits 2 without listening for %j', async (argv, extra) => {
     const w = await workspace();
     const s = streams();

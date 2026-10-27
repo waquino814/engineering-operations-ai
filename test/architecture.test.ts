@@ -63,6 +63,7 @@ describe('module boundaries', () => {
       'app/data-dirs.ts',
       'app/http-server.ts',
       'app/run-store.ts',
+      'app/settings.ts',
       'evaluation/cli.ts',
       'evaluation/ground-truth.ts',
       'evaluation/leakage.ts',
@@ -89,9 +90,14 @@ describe('module boundaries', () => {
     for (const file of all.keys()) if (file.startsWith('app/')) visit(file);
     expect(reachable.size).toBeGreaterThan(10);
     for (const file of reachable) {
-      expect(file, 'reachable from the runnable application').not.toMatch(/^providers\//);
+      // The local Ollama adapter and the shared wire schema are runnable; nothing hosted is.
+      expect(file, 'reachable from the runnable application').not.toMatch(
+        /^providers\/(anthropic\/|select\.ts)/,
+      );
       for (const spec of imports(all.get(file) ?? ''))
-        expect(spec, `${file} imports ${spec}`).not.toMatch(/@anthropic-ai|providers\//);
+        expect(spec, `${file} imports ${spec}`).not.toMatch(
+          /@anthropic-ai|providers\/(anthropic|select)/,
+        );
     }
   });
 
@@ -104,6 +110,22 @@ describe('module boundaries', () => {
       (await sources('app')).find((f) => f.file === join('app', 'http-server.ts'))?.text ?? '';
     expect(text).not.toMatch(/0\.0\.0\.0|\.listen\(\d|listen\(\s*port/);
     expect(text).toContain('resolveListenHost(options.host)');
+  });
+
+  it('lets only the Ollama client reach the network, through a validated loopback endpoint', async () => {
+    const all = await sources();
+    const fetchers = all
+      .filter(({ text }) => /\bfetch\(/.test(text))
+      .map(({ file }) => file)
+      .sort();
+    expect(fetchers).toEqual([
+      join('providers', 'ollama', 'client.ts'),
+      join('ui', 'data', 'http-source.ts'),
+    ]);
+    const client = all.find((f) => f.file === join('providers', 'ollama', 'client.ts'))?.text ?? '';
+    expect(client).toContain("redirect: 'error'");
+    expect(client).toContain('LOOPBACK_HOSTS');
+    expect(client).not.toMatch(/https?:\/\/(?!127\.0\.0\.1|\$\{)/);
   });
 
   it('limits the console to same-origin /api/ requests', async () => {
@@ -187,7 +209,9 @@ describe('module boundaries', () => {
       // Narrow exceptions: the loopback server listens (it never calls out), and the console's
       // HTTP source fetches its own origin's /api/ paths. Both are checked by tests below.
       const listens = file === join('app', 'http-server.ts');
-      const fetches = file === join('ui', 'data', 'http-source.ts');
+      const fetches =
+        file === join('ui', 'data', 'http-source.ts') ||
+        file === join('providers', 'ollama', 'client.ts');
       expect(text, file).not.toMatch(
         listens
           ? /\bfetch\(|XMLHttpRequest|WebSocket|from 'node:(https|net|tls|dgram)'/
@@ -197,10 +221,18 @@ describe('module boundaries', () => {
       );
       // ADR 0008: the Anthropic SDK is allowed in its adapter directory and nowhere else.
       const adapter = file.startsWith(join('providers', 'anthropic') + '/');
+      const mentionsOllama =
+        file.startsWith(join('providers', 'ollama') + '/') ||
+        file.startsWith('app/') ||
+        file.startsWith('ui/') ||
+        file === 'cli.ts' ||
+        file === join('investigation', 'simulated-provider.ts');
       expect(text, file).not.toMatch(
         adapter
           ? /openai|@google\/generative|ollama/i
-          : /@anthropic-ai|openai|@google\/generative|ollama/i,
+          : mentionsOllama
+            ? /@anthropic-ai|openai|@google\/generative/i
+            : /@anthropic-ai|openai|@google\/generative|ollama/i,
       );
     }
     const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {

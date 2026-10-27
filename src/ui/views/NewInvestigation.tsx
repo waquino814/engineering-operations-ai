@@ -24,6 +24,7 @@ export function NewInvestigation({ source }: { source: InvestigationDataSource }
     Unavailable | { status: 'uploaded'; bundleId: string } | null
   >(null);
   const [start, setStart] = useState<StartOutcome | null>(null);
+  const [running, setRunning] = useState(false);
 
   const choose = (bundleId: string) => {
     setSelected(bundleId);
@@ -51,6 +52,7 @@ export function NewInvestigation({ source }: { source: InvestigationDataSource }
   const valid = validation?.status === 'ready' && validation.value.valid;
   // A start is offered only when the application says it can run one; until it answers, it is not.
   const blocked = status.status === 'ready' && !status.value.runnable;
+  const simulated = status.status === 'ready' && status.value.simulated;
   const canStart = valid && selected !== null && status.status === 'ready' && status.value.runnable;
 
   return (
@@ -130,12 +132,12 @@ export function NewInvestigation({ source }: { source: InvestigationDataSource }
           {blocked && (
             <div className="notice" role="status">
               <p>
-                <strong>No investigation can run.</strong>{' '}
+                <strong>The selected provider cannot run.</strong>{' '}
                 {status.value.reason ?? 'No runnable provider.'}
               </p>
               <p>
-                The application never fabricates findings: with no runnable provider, nothing is run
-                and nothing is stored.
+                Nothing was run and nothing is stored. The application never falls back to another
+                provider or fabricates findings.
               </p>
             </div>
           )}
@@ -147,19 +149,37 @@ export function NewInvestigation({ source }: { source: InvestigationDataSource }
           <button
             type="button"
             className="button button--primary"
-            disabled={!canStart}
+            disabled={!canStart || running}
             onClick={() => {
-              if (selected)
-                void source.startInvestigation(selected).then(setStart, (err: unknown) => {
+              if (!selected) return;
+              setRunning(true);
+              setStart(null);
+              void source
+                .startInvestigation(selected)
+                .then(setStart, (err: unknown) => {
                   setStart({
                     status: 'error',
                     message: err instanceof Error ? err.message : String(err),
                   });
+                })
+                .finally(() => {
+                  setRunning(false);
                 });
             }}
           >
-            Start investigation
+            {running ? 'Running…' : 'Start investigation'}
           </button>
+          {running && (
+            <p className="notice" role="status">
+              Running. A local model can take several minutes; keep this page open.
+            </p>
+          )}
+          {simulated && !blocked && (
+            <p className="notice" role="status">
+              The selected provider is the Fake provider: the result will be a simulated
+              placeholder, not an AI investigation. Choose Ollama in Settings for a real one.
+            </p>
+          )}
           {start?.status === 'unavailable' && (
             <div className="notice" role="status">
               <p>{start.reason}</p>

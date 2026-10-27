@@ -4,6 +4,7 @@ import {
   KeyValues,
   Loading,
   OriginTag,
+  ProviderBadge,
   Panel,
   StatusBadge,
 } from '../components.tsx';
@@ -79,7 +80,8 @@ function Workspace({ record }: { record: InvestigationRecord }) {
             )}
           </h1>
           <p className="page__subtitle">
-            {record.label} · <OriginTag origin={record.origin} />
+            {record.label} · <OriginTag origin={record.origin} /> ·{' '}
+            <ProviderBadge provider={result.run.provider} model={result.run.model} />
           </p>
         </div>
         <StatusBadge outcome={outcome.key} label={outcome.label} />
@@ -266,7 +268,7 @@ function RunDetails({ record }: { record: InvestigationRecord }) {
     <Panel title="Run">
       <KeyValues
         rows={[
-          ['Provider', `${run.provider} · ${run.model}`],
+          ['Provider', <ProviderBadge provider={run.provider} model={run.model} />],
           ['Started', formatTime(run.startedAt)],
           ['Finished', formatTime(run.finishedAt)],
           ['Duration', `${formatNumber(run.durationMs)} ms`],

@@ -67,11 +67,24 @@ export type StartOutcome =
       /** Precomputed fixture investigations for the same bundle. */ fixtureInvestigationIds: string[];
     });
 
-/** Whether a run can start, and if not, why; never a path or a setting. */
+/** The selected provider and whether it can run now, kept apart; never a path or a secret. */
 export interface ProviderStatus {
-  provider: string;
+  selected: 'fake' | 'ollama' | 'fixture';
+  /** True when the environment fixes the choice and Settings cannot change it. */
+  pinned: boolean;
   runnable: boolean;
+  /** True for the deterministic fake provider: its output is simulated, not AI-generated. */
+  simulated: boolean;
+  model: string | null;
+  /** Installed local models, when the runtime answered. */
+  models: string[];
   reason: string | null;
+}
+
+export interface ProviderSettings {
+  provider: 'fake' | 'ollama';
+  ollamaModel: string | null;
+  pinned: boolean;
 }
 
 /**
@@ -82,6 +95,12 @@ export interface InvestigationDataSource {
   /** What the console tells the operator about where data comes from. */
   readonly description: { mode: Origin; notice: string };
   getProviderStatus(): Promise<ProviderStatus>;
+  getSettings(): Promise<ProviderSettings>;
+  /** Rejects when the application refuses the choice; never falls back to another provider. */
+  saveSettings(input: {
+    provider: 'fake' | 'ollama';
+    ollamaModel: string | null;
+  }): Promise<ProviderSettings>;
   listInvestigations(): Promise<InvestigationRecord[]>;
   getInvestigation(id: string): Promise<InvestigationRecord | null>;
   listBundles(): Promise<BundleOption[]>;
