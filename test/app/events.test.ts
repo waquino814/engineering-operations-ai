@@ -255,7 +255,14 @@ describe('serve --events stderr', () => {
       );
     });
     const port = Number(/http:\/\/127\.0\.0\.1:(\d+)\n/.exec(out)?.[1]);
-    return { w, port, stop, exit, err: () => err };
+    // `serve` also says on stderr when the console is not built, which depends on whether
+    // `pnpm ui:build` has run (CI runs the tests first); only event lines are of interest here.
+    const events = () =>
+      err
+        .split('\n')
+        .filter((line) => line.startsWith('{'))
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+    return { w, port, stop, exit, err: () => err, events };
   };
 
   it('writes the application’s events to stderr as JSON lines when asked', async () => {
@@ -263,11 +270,7 @@ describe('serve --events stderr', () => {
     expect(await post(s.port, { bundleId: s.w.excerptId })).toBe(201);
     await s.stop();
     expect(await s.exit).toBe(0);
-    const lines = s
-      .err()
-      .trim()
-      .split('\n')
-      .map((l) => JSON.parse(l) as Record<string, unknown>);
+    const lines = s.events();
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatchObject({ v: 1, event: 'investigation.finished', outcome: 'completed' });
     expect(s.err()).not.toContain(s.w.bundlesDir);
@@ -278,6 +281,7 @@ describe('serve --events stderr', () => {
     expect(await post(s.port, { bundleId: s.w.excerptId })).toBe(201);
     await s.stop();
     await s.exit;
-    expect(s.err()).toBe('');
+    expect(s.events()).toEqual([]);
+    expect(s.err()).not.toContain('"event"');
   });
 });
