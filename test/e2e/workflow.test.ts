@@ -153,6 +153,7 @@ let apiPort: number;
 let uiPort: number;
 let env: Record<string, string>;
 let dev: Proc;
+let readyMark = 0;
 const data = () => join(home, '.engineering-operations-ai');
 
 async function startDev() {
@@ -161,6 +162,9 @@ async function startDev() {
     const r = await http(uiPort, 'GET', '/healthz');
     return r.status === 200 ? r : null;
   });
+  // Vite may log proxy errors while the probe above polls before the application is listening;
+  // that is expected, and only what is logged from here on counts.
+  readyMark = dev.log().length;
 }
 
 beforeAll(async () => {
@@ -327,7 +331,7 @@ describe('local workflow, as real processes', { timeout: 120_000 }, () => {
     expect(dev.child.exitCode).toBe(0);
     expect(await closed(apiPort)).toBe(true);
     expect(await closed(uiPort)).toBe(true);
-    expect(dev.log()).not.toMatch(/error/i);
+    expect(dev.log().slice(readyMark)).not.toMatch(/error/i);
   });
 });
 
