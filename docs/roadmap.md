@@ -115,7 +115,7 @@ Completed (foundation):
 - [x] A separate scoring boundary: only `src/evaluation/` reads the answer key, after the investigation ([ADR 0009](adr/0009-evaluation-harness-and-scoring.md), proposed).
 - [x] Scoring v0: root cause, and precision and recall of affected components.
 - [x] Deterministic leak detection over every request and the result's metadata: answer text, excluded and unknown manifest fields, the bundle location; exact, normalized and encoded matches; positive controls, a recorded paraphrase limit, and a pipeline-level canary test.
-- [x] A deterministic report from eight synthetic cases, compared byte for byte in CI (`pnpm eval:synthetic`, [docs/evaluation.md](evaluation.md)).
+- [x] A deterministic report from synthetic cases (eight at delivery, ten now), compared byte for byte in CI (`pnpm eval:synthetic`, [docs/evaluation.md](evaluation.md)).
 
 In progress or blocked:
 
