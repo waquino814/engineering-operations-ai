@@ -11,7 +11,7 @@ Status: **proposed**, with one owner decision. The portfolio order, this backend
 |     1 | E0 Foundation, E1 intake                                 | complete                                                                        | —                                                                                           |
 |     1 | E2 investigation backend, E3 evaluation: the foundations | foundations delivered (`a65e5b9`); not complete; remaining scope moved to E5–E7 | E1                                                                                          |
 |     2 | E4 Investigation UI                                      | complete (2026-10-26): commit `43d5987`, CI passed                              | E2/E3 foundations and the result contract; **no** provider, credentials or external AI call |
-|     3 | E5 Provider integration                                  | not started                                                                     | owner approval of ADR 0008 after its verification; credentials and a spending budget        |
+|     3 | E5 Provider integration                                  | in progress (adapter, no network)                                               | owner approval of ADR 0008 after its verification; credentials and a spending budget        |
 |     4 | E6 End-to-end integration                                | not started                                                                     | E4, E5, and an ADR for the application/API boundary                                         |
 |     5 | E7 Evaluation and hardening                              | not started                                                                     | E6; varied-timing bundles from Commerce Platform for full coverage                          |
 
@@ -177,7 +177,7 @@ An operator-facing investigation console, inside this repository, built on deter
 
 ## E5: Provider integration
 
-**Status: not started.** After E4. Carries forward E2's provider scope.
+**Status: in progress (2026-10-27), uncommitted.** ADR 0008 accepted by the owner. Done: verification against official docs, the derived wire schema, request/usage/error/reply mapping, and the streaming adapter with the SDK pinned, tested with a stubbed client and no network. Open: environment configuration wiring, the facts ADR 0008 marks open, credentials and a budget, and the controlled evaluation. After E4. Carries forward E2's provider scope.
 
 - Verify ADR 0008's facts against the provider's current official documentation ([ADR 0008](adr/0008-model-provider-recommendation.md), "Verification required before approval"), then the owner approves, revises or rejects ADR 0008.
 - Finalize provider-specific token accounting and configuration: map the provider's usage fields (including cached input) into `UsageReport`; decide when an error may report zero usage; confirm `maxInputTokensPerCall` with the provider's token counting ([ADR 0006](adr/0006-investigation-pipeline-and-limits.md)).

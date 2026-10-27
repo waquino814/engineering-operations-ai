@@ -134,18 +134,33 @@ describe('module boundaries', () => {
       expect(text, file).not.toMatch(
         /\bfetch\(|XMLHttpRequest|WebSocket|from 'node:(http|https|net|tls|dgram)'/,
       );
-      expect(text, file).not.toMatch(/@anthropic-ai|openai|@google\/generative|ollama/i);
+      // ADR 0008: the Anthropic SDK is allowed in its adapter directory and nowhere else.
+      const adapter = file.startsWith(join('providers', 'anthropic') + '/');
+      expect(text, file).not.toMatch(
+        adapter
+          ? /openai|@google\/generative|ollama/i
+          : /@anthropic-ai|openai|@google\/generative|ollama/i,
+      );
     }
     const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
       dependencies: Record<string, string>;
     };
-    // ADR 0011 adds exactly React for the console; nothing else runs in production.
+    // ADR 0011 adds React for the console; ADR 0008 adds the Anthropic SDK for its adapter only.
     expect(Object.keys(pkg.dependencies).sort()).toEqual([
+      '@anthropic-ai/sdk',
       'ajv',
       'ajv-formats',
       'react',
       'react-dom',
     ]);
+  });
+
+  it('lets only the Anthropic adapter import the SDK, and keeps it out of the console', async () => {
+    const users = (await sources())
+      .filter(({ text }) => imports(text).some((s) => s.startsWith('@anthropic-ai/')))
+      .map(({ file }) => file)
+      .sort();
+    expect(users).toEqual([join('providers', 'anthropic', 'provider.ts')]);
   });
 
   it('keeps the console to the browser, the result contract and its own data interface', async () => {
