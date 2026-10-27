@@ -295,6 +295,10 @@ h1 {
 .table--compact td {
   padding: 4px 8px;
 }
+.table td .tag {
+  /* Long provider and model names wrap in a cell rather than clip behind the table's scrollbar. */
+  white-space: normal;
+}
 .num {
   text-align: right !important;
   font-variant-numeric: tabular-nums;
@@ -307,6 +311,8 @@ h1 {
 }
 .cell-wrap {
   min-width: 220px;
+  /* Hashes and ids in messages have no break points; wrap them rather than widen the table. */
+  overflow-wrap: anywhere;
 }
 
 /* Status */
@@ -632,6 +638,8 @@ h1 {
 @media (max-width: 960px) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
+    /* Without this, a short page splits the spare height between the strip and the content. */
+    grid-template-rows: auto 1fr;
   }
   .sidebar {
     overflow-x: auto;

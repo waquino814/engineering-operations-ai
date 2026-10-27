@@ -1,10 +1,12 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+import { resultValidatorSource } from './scripts/standalone-validator.ts';
 
 /**
  * The investigation console's build (ADR 0011): `pnpm ui:dev` serves it, `pnpm ui:build` writes
- * dist/ui/. No plugins: Vite's built-in transform handles TSX. Only the console is built; the
- * library and CLI still run from source.
+ * dist/ui/. Vite's built-in transform handles TSX; the one plugin below keeps the console working
+ * under the application's Content-Security-Policy. Only the console is built; the library and CLI
+ * still run from source.
  */
 // The application's port: EOAI_PORT, as for `serve`, so the proxy follows it.
 const rawPort = process.env['EOAI_PORT'];
@@ -30,7 +32,27 @@ export function presentAsSameOrigin(proxy: {
   });
 }
 
+const RESULT_VALIDATOR = fileURLToPath(
+  new URL('./src/investigation/result-validator.ts', import.meta.url),
+);
+
+/**
+ * The application serves the console with `default-src 'self'`, which forbids the `new Function`
+ * that Ajv uses to compile a schema in the browser. In the console's build, the result validator
+ * is replaced by the same schema precompiled at build time; the policy stays strict.
+ */
+export function precompiledResultValidator(): Plugin {
+  return {
+    name: 'precompiled-result-validator',
+    enforce: 'pre',
+    load(id) {
+      return id === RESULT_VALIDATOR ? resultValidatorSource() : undefined;
+    },
+  };
+}
+
 export default defineConfig({
+  plugins: [precompiledResultValidator()],
   root: fileURLToPath(new URL('./src/ui/', import.meta.url)),
   base: './',
   // Development only: forward the console's API calls to the local application (`pnpm serve`).

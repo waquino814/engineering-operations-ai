@@ -2,8 +2,8 @@ import { Ajv2020, type ErrorObject } from 'ajv/dist/2020.js';
 import type { TelemetryFile } from '../intake/contract.ts';
 import type { InvestigationLimits } from './config.ts';
 import type { Failure } from './failures.ts';
+import { validateResult, type SchemaValidator } from './result-validator.ts';
 import {
-  INVESTIGATION_RESULT_SCHEMA,
   MODEL_OUTPUT_SCHEMA,
   RESULT_SCHEMA_VERSION,
   SUPPORTED_MODEL_OUTPUT_VERSIONS,
@@ -115,9 +115,11 @@ export interface OutputProblem {
   message: string;
 }
 
-const ajv = new Ajv2020({ strict: true, allErrors: true });
-const validateOutput = ajv.compile(MODEL_OUTPUT_SCHEMA);
-const validateResult = ajv.compile(INVESTIGATION_RESULT_SCHEMA);
+// Compiled on first use: only the application parses model output, and runtime compilation is not
+// possible in the console under its Content-Security-Policy (see result-validator.ts).
+let compiledOutput: SchemaValidator | undefined;
+const outputValidator = (): SchemaValidator =>
+  (compiledOutput ??= new Ajv2020({ strict: true, allErrors: true }).compile(MODEL_OUTPUT_SCHEMA));
 
 const describe = (e: ErrorObject) => {
   const path = e.instancePath.split('/').slice(1).join('.');
@@ -174,6 +176,7 @@ export function parseModelOutput(
       ],
     };
   }
+  const validateOutput = outputValidator();
   if (!validateOutput(value)) {
     return {
       ok: false,
@@ -183,7 +186,7 @@ export function parseModelOutput(
       })),
     };
   }
-  return { ok: true, output: value };
+  return { ok: true, output: value as ModelOutput };
 }
 
 /** Checks an assembled result against the published result schema. */
