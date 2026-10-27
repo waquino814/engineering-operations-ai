@@ -71,8 +71,11 @@ describe('src/cli.ts investigate, as a real subprocess', () => {
     },
   );
 
-  it('rejects missing configuration with exit 2 and names the variables', async () => {
-    const r = await cliRun(['investigate', 'x'], {});
+  it('rejects a relative data directory with exit 2 and names the variable', async () => {
+    const r = await cliRun(['investigate', 'x'], {
+      EOAI_BUNDLES_DIR: 'relative',
+      EOAI_RUNS_DIR: 'relative',
+    });
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('EOAI_BUNDLES_DIR');
     expect(r.stderr).toContain('EOAI_RUNS_DIR');

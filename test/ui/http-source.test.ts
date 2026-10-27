@@ -82,8 +82,8 @@ describe('listing and reading investigations', () => {
       code: 'run_unreadable',
       message: err.error.message,
     });
-    const b = stub({ '/api/runs': { raw: '<html>', status: 502 } });
-    await expect(b.source.listInvestigations()).rejects.toThrow(/unreadable response \(HTTP 502\)/);
+    const b = stub({ '/api/runs': { raw: '<html>', status: 500 } });
+    await expect(b.source.listInvestigations()).rejects.toThrow(/unreadable response \(HTTP 500\)/);
     const c = stub({ '/api/runs': { body: { runs: 'x' } } });
     await expect(c.source.listInvestigations()).rejects.toThrow(/malformed/);
     const d = stub({ '/api/runs': { raw: '[1]' } });
@@ -92,11 +92,53 @@ describe('listing and reading investigations', () => {
     await expect(e.source.listInvestigations()).rejects.toThrow(/reported an error/);
   });
 
+  it('explains an empty gateway error from a proxy in front of an absent application', async () => {
+    // What Vite's dev proxy sends when nothing listens on the application's port.
+    for (const status of [502, 503, 504]) {
+      const { source } = stub({ '/api/runs': { status, raw: '' } });
+      const error = await source.listInvestigations().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).code).toBe('application_unreachable');
+      expect((error as Error).message).toBe(
+        `The local application is not reachable (HTTP ${String(status)}). Start it with "pnpm serve", then retry.`,
+      );
+    }
+    // Other unreadable bodies keep the generic message, and a structured 502 is the server's own.
+    const odd = stub({ '/api/runs': { status: 500, raw: '' } });
+    await expect(odd.source.listInvestigations()).rejects.toThrow(
+      /unreadable response \(HTTP 500\)/,
+    );
+    const own = stub({
+      '/api/runs': { status: 502, body: { error: { code: 'x', message: 'structured' } } },
+    });
+    await expect(own.source.listInvestigations()).rejects.toThrow('structured');
+  });
+
   it('reports a network failure as an error the views can show', async () => {
     const { source } = stub({ '/api/runs': new TypeError('Failed to fetch') });
     const error = await source.listInvestigations().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ApiError);
     expect((error as Error).message).toMatch(/could not be reached/);
+  });
+});
+
+describe('provider status', () => {
+  it('reads whether a run can start, and rejects a malformed status', async () => {
+    const reason = 'no runnable provider. Nothing was run.';
+    const a = stub({ '/api/status': { body: { provider: 'fake', runnable: false, reason } } });
+    expect(await a.source.getProviderStatus()).toEqual({
+      provider: 'fake',
+      runnable: false,
+      reason,
+    });
+    const b = stub({ '/api/status': { body: { provider: 'fake', runnable: true, reason: null } } });
+    expect((await b.source.getProviderStatus()).runnable).toBe(true);
+    const c = stub({
+      '/api/status': { body: { provider: 'fake', runnable: 'yes', reason: null } },
+    });
+    await expect(c.source.getProviderStatus()).rejects.toThrow(/malformed/);
+    const d = stub({ '/api/status': { status: 502, raw: '' } });
+    await expect(d.source.getProviderStatus()).rejects.toThrow(/not reachable/);
   });
 });
 

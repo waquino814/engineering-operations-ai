@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { extname, join } from 'node:path';
 import { createApplication, type AppDeps, type Application } from './application.ts';
+import { ensureDataDirs } from './data-dirs.ts';
 import type { AppEnv } from './provider-gate.ts';
 
 /**
@@ -44,6 +45,8 @@ export interface ServerOptions {
   appDeps?: Omit<AppDeps, 'signal'>;
   host?: string;
   port?: number;
+  /** Create the bundles and runs directories when missing, once the provider gate has passed. */
+  ensureDirs?: boolean;
   /** A built console (dist/ui); read into memory at startup and served by exact path. */
   staticDir?: string;
 }
@@ -160,6 +163,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     ...options.appDeps,
     signal: abort.signal,
   });
+  if (options.ensureDirs) await ensureDataDirs([app.config.bundlesDir, app.config.runsDir]);
   const assets = options.staticDir
     ? await loadStatic(options.staticDir)
     : new Map<string, { body: Buffer; type: string }>();
@@ -188,6 +192,16 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     if (path === '/healthz') {
       if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
       return send(res, 200, { status: 'ok' });
+    }
+    if (path === '/api/status') {
+      if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
+      // What the console needs to be honest about starting a run; no path or setting is included.
+      const { name, runnable } = app.config.provider;
+      return send(res, 200, {
+        provider: name,
+        runnable,
+        reason: runnable ? null : ERRORS['no_runnable_provider']?.[1],
+      });
     }
     if (path === '/api/runs') {
       if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });

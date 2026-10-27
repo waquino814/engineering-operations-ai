@@ -36,6 +36,8 @@ export function createFixtureSource(fixtures: UiFixtures): InvestigationDataSour
 
   return {
     description: { mode: 'fixture', notice: fixtures.notice },
+    // Starting answers "unavailable" with its reason and the precomputed runs, so it is offered.
+    getProviderStatus: () => Promise.resolve({ provider: 'fixture', runnable: true, reason: null }),
     listInvestigations: () =>
       Promise.resolve(
         [...investigations].sort((a, b) =>

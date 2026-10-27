@@ -284,6 +284,30 @@ describe('request validation', () => {
   });
 });
 
+describe('status', () => {
+  it('says plainly whether a run can start, without paths or settings', async () => {
+    const none = await serve({ steps: 'none' });
+    try {
+      const r = await call(none.server, 'GET', '/api/status');
+      expect(r.status).toBe(200);
+      expect(r.json()).toMatchObject({ provider: 'fake', runnable: false });
+      expect(r.text).toContain('Nothing was run');
+      expect(r.text).not.toContain(none.w.bundlesDir);
+      expect((await call(none.server, 'POST', '/api/status')).status).toBe(405);
+    } finally {
+      await none.server.close();
+    }
+    const some = await serve();
+    try {
+      expect((await call(some.server, 'GET', '/api/status')).text).toBe(
+        '{"provider":"fake","runnable":true,"reason":null}',
+      );
+    } finally {
+      await some.server.close();
+    }
+  });
+});
+
 describe('investigations', () => {
   it('stores a run through the application and lists and reads it back, validated', async () => {
     const { w, server } = await serve();

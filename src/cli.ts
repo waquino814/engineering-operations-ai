@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import { ContractError } from './intake/contract.ts';
 import { validateBundle } from './intake/validate-bundle.ts';
 import { AppConfigError } from './app/config.ts';
@@ -10,6 +11,7 @@ import {
   startServer,
 } from './app/http-server.ts';
 import { summarize } from './investigation/summary.ts';
+import { withDataDefaults } from './app/data-dirs.ts';
 
 /**
  * `node src/cli.ts validate <bundle-dir> [--json]`: validates a bundle against the contract.
@@ -75,6 +77,8 @@ async function investigate(
 }
 
 export interface CliDeps extends AppDeps {
+  /** The user's home directory; when given, data directories default to a place under it. */
+  home?: string;
   /** Called with a function that stops the server; the entry point wires signals to it. */
   onServing?: (stop: () => Promise<void>) => void;
 }
@@ -89,6 +93,9 @@ async function serve(
 ): Promise<number> {
   let host: string | undefined;
   let port: number | undefined;
+  const fromEnv = env['EOAI_PORT'];
+  if (fromEnv !== undefined && fromEnv !== '')
+    port = /^\d{1,5}$/.test(fromEnv) ? Number(fromEnv) : -1;
   for (let i = 0; i < rest.length; i += 2) {
     const value = rest[i + 1];
     if (rest[i] === '--host' && value !== undefined) host = value;
@@ -105,8 +112,10 @@ async function serve(
     const { onServing } = deps;
     const appDeps: AppDeps = { ...deps };
     delete appDeps.signal;
+    const withDirs = deps.home === undefined ? env : withDataDefaults(env, deps.home);
     const server = await startServer({
-      env,
+      env: withDirs,
+      ensureDirs: true,
       appDeps,
       ...(host === undefined ? {} : { host }),
       ...(port === undefined ? {} : { port }),
@@ -151,7 +160,14 @@ export async function main(
     return serve(args.slice(1), out, err, env, deps);
   }
   if (args[0] === 'investigate' && args.length === 2 && args[1] !== undefined) {
-    return investigate(args[1], json, out, err, env, deps);
+    return investigate(
+      args[1],
+      json,
+      out,
+      err,
+      deps.home === undefined ? env : withDataDefaults(env, deps.home),
+      deps,
+    );
   }
   if (args[0] !== 'validate' || args.length !== 2 || args[1] === undefined) {
     err.write(`${USAGE}\n`);
@@ -197,6 +213,7 @@ if (import.meta.url === `file://${process.argv[1] ?? ''}`) {
     process.stderr,
     process.env,
     {
+      home: homedir(),
       signal: controller.signal,
       onServing: (stop) => {
         for (const sig of ['SIGINT', 'SIGTERM'] as const) process.once(sig, () => void stop());

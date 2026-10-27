@@ -17,6 +17,7 @@ import { useAsync, type AsyncState } from '../use-async.ts';
  */
 export function NewInvestigation({ source }: { source: InvestigationDataSource }) {
   const [bundles, reloadBundles] = useAsync(() => source.listBundles(), [source]);
+  const [status] = useAsync(() => source.getProviderStatus(), [source]);
   const [selected, setSelected] = useState<string | null>(null);
   const [validation, setValidation] = useState<AsyncState<BundleValidation> | null>(null);
   const [upload, setUpload] = useState<
@@ -48,6 +49,9 @@ export function NewInvestigation({ source }: { source: InvestigationDataSource }
   };
 
   const valid = validation?.status === 'ready' && validation.value.valid;
+  // A start is offered only when the application says it can run one; until it answers, it is not.
+  const blocked = status.status === 'ready' && !status.value.runnable;
+  const canStart = valid && selected !== null && status.status === 'ready' && status.value.runnable;
 
   return (
     <div className="page">
@@ -123,10 +127,27 @@ export function NewInvestigation({ source }: { source: InvestigationDataSource }
               ? 'The bundle is valid and can be investigated.'
               : 'An investigation can start only from a valid bundle.'}
           </p>
+          {blocked && (
+            <div className="notice" role="status">
+              <p>
+                <strong>No investigation can run.</strong>{' '}
+                {status.value.reason ?? 'No runnable provider.'}
+              </p>
+              <p>
+                The application never fabricates findings: with no runnable provider, nothing is run
+                and nothing is stored.
+              </p>
+            </div>
+          )}
+          {status.status === 'error' && (
+            <p className="notice notice--error" role="alert">
+              Could not check whether an investigation can run: {status.message}
+            </p>
+          )}
           <button
             type="button"
             className="button button--primary"
-            disabled={!valid || selected === null}
+            disabled={!canStart}
             onClick={() => {
               if (selected)
                 void source.startInvestigation(selected).then(setStart, (err: unknown) => {

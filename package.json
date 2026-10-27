@@ -22,7 +22,9 @@
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm ui:build",
     "eval:synthetic": "node src/evaluation/cli.ts",
     "fixtures:ui": "node src/evaluation/ui-fixtures.ts > src/ui/fixtures/fixtures.json",
+    "dev": "node scripts/dev.ts",
     "serve": "node src/cli.ts serve",
+    "demo:seed": "node scripts/seed-demo.ts",
     "ui:dev": "vite",
     "ui:build": "vite build"
   },

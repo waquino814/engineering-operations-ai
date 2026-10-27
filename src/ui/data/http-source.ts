@@ -24,6 +24,8 @@ export class ApiError extends Error {
   }
 }
 
+const GATEWAY_STATUSES = new Set([502, 503, 504]);
+
 type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -43,6 +45,13 @@ export function createHttpSource(
     try {
       body = await response.json();
     } catch {
+      // A proxy in front of an absent application (Vite's dev proxy, for one) answers with an
+      // empty text/plain 502, 503 or 504. Say what that means; it is still an error.
+      if (GATEWAY_STATUSES.has(response.status))
+        throw new ApiError(
+          `The local application is not reachable (HTTP ${String(response.status)}). Start it with "pnpm serve", then retry.`,
+          'application_unreachable',
+        );
       throw new ApiError(
         `The local application sent an unreadable response (HTTP ${String(response.status)}).`,
       );
@@ -88,6 +97,16 @@ export function createHttpSource(
       mode: 'local',
       notice:
         'Connected to the local application on this machine. It runs no hosted model; a run needs a provider the application permits.',
+    },
+    async getProviderStatus() {
+      const body = await ok('/api/status');
+      if (
+        typeof body['provider'] !== 'string' ||
+        typeof body['runnable'] !== 'boolean' ||
+        (body['reason'] !== null && typeof body['reason'] !== 'string')
+      )
+        throw new ApiError('The status response is malformed.');
+      return { provider: body['provider'], runnable: body['runnable'], reason: body['reason'] };
     },
     async listInvestigations() {
       const body = await ok('/api/runs');

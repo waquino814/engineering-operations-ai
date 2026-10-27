@@ -162,6 +162,42 @@ describe('starting and uploading', () => {
     expect(within(notice).queryAllByRole('link')).toEqual([]);
   });
 
+  it('says honestly that nothing can run, and does not offer a start, when no provider is runnable', async () => {
+    const reason = 'no runnable provider is configured. Nothing was run.';
+    const start = vi.fn();
+    renderAt(
+      '#/new',
+      sourceWith({
+        getProviderStatus: () => Promise.resolve({ provider: 'fake', runnable: false, reason }),
+        startInvestigation: start,
+      }),
+    );
+    await choose('Fixture bundle A');
+    await within(panel('2. Validation')).findByText(/^Valid/);
+    const notice = await within(panel('3. Start')).findByText(/No investigation can run/);
+    expect(notice.parentElement?.textContent).toContain(reason);
+    expect(panel('3. Start').textContent).toContain('never fabricates findings');
+    const button = within(panel('3. Start')).getByRole('button', { name: 'Start investigation' });
+    expect(button).toHaveProperty('disabled', true);
+    fireEvent.click(button);
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it('does not offer a start while the status is unknown, and says so if it cannot be read', async () => {
+    renderAt(
+      '#/new',
+      sourceWith({ getProviderStatus: () => Promise.reject(new Error('status unreadable')) }),
+    );
+    await choose('Fixture bundle A');
+    await within(panel('2. Validation')).findByText(/^Valid/);
+    expect((await within(panel('3. Start')).findByRole('alert')).textContent).toContain(
+      'status unreadable',
+    );
+    expect(
+      within(panel('3. Start')).getByRole('button', { name: 'Start investigation' }),
+    ).toHaveProperty('disabled', true);
+  });
+
   it('shows a failed start as an alert and never as a started investigation', async () => {
     renderAt(
       '#/new',

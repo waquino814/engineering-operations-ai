@@ -67,6 +67,13 @@ export type StartOutcome =
       /** Precomputed fixture investigations for the same bundle. */ fixtureInvestigationIds: string[];
     });
 
+/** Whether a run can start, and if not, why; never a path or a setting. */
+export interface ProviderStatus {
+  provider: string;
+  runnable: boolean;
+  reason: string | null;
+}
+
 /**
  * Everything the console needs from a backend. E6 implements it over the real application
  * boundary; until then `createFixtureSource` implements it over fixtures, and says so.
@@ -74,6 +81,7 @@ export type StartOutcome =
 export interface InvestigationDataSource {
   /** What the console tells the operator about where data comes from. */
   readonly description: { mode: Origin; notice: string };
+  getProviderStatus(): Promise<ProviderStatus>;
   listInvestigations(): Promise<InvestigationRecord[]>;
   getInvestigation(id: string): Promise<InvestigationRecord | null>;
   listBundles(): Promise<BundleOption[]>;

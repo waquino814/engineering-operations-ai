@@ -2,7 +2,7 @@
 import { act, fireEvent, renderHook, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { href, parseRoute, useRoute } from '../../src/ui/router.ts';
-import { fixtures, renderAt } from './support.tsx';
+import { deferred, fixtures, renderAt, sourceWith } from './support.tsx';
 
 /** The console shell: navigation, routing and the read-only settings. */
 const go = async (hash: string) => {
@@ -105,15 +105,46 @@ describe('the shell', () => {
 });
 
 describe('settings', () => {
-  it('are read-only and say where data comes from, with no provider configured', () => {
+  it('are read-only and say where data comes from, with no provider configured', async () => {
     renderAt('#/settings');
     const main = screen.getByRole('main');
     expect(main.textContent).toContain(fixtures.notice);
     expect(main.textContent).toContain('No runnable provider.');
+    expect(await within(main).findByText(/^Yes \(fixture\)/)).toBeDefined();
     expect(main.textContent).toContain('No hosted model can be enabled here.');
     expect(main.textContent).toContain('investigation-result 0.1.0');
     expect(main.textContent).toContain('maxTotalTokens816,000');
     expect(within(main).queryAllByRole('textbox')).toEqual([]);
     expect(within(main).queryAllByRole('button')).toEqual([]);
+  });
+
+  it('shows the provider status as checking, unknown or not runnable, never as runnable by default', async () => {
+    const pending = deferred<{ provider: string; runnable: boolean; reason: string | null }>();
+    renderAt('#/settings', sourceWith({ getProviderStatus: () => pending.promise }));
+    const main = screen.getByRole('main');
+    expect(main.textContent).toContain('Checking…');
+    pending.resolve({ provider: 'fake', runnable: false, reason: 'Nothing was run.' });
+    expect(await within(main).findByText('No: Nothing was run.')).toBeDefined();
+  });
+
+  it('says when the status cannot be read, or has no reason', async () => {
+    renderAt(
+      '#/settings',
+      sourceWith({ getProviderStatus: () => Promise.reject(new Error('down')) }),
+    );
+    expect(await within(screen.getByRole('main')).findByText('Unknown: down')).toBeDefined();
+  });
+
+  it('falls back to a plain reason when a blocked status gives none', async () => {
+    renderAt(
+      '#/settings',
+      sourceWith({
+        getProviderStatus: () =>
+          Promise.resolve({ provider: 'fake', runnable: false, reason: null }),
+      }),
+    );
+    expect(
+      await within(screen.getByRole('main')).findByText('No: no runnable provider'),
+    ).toBeDefined();
   });
 });
