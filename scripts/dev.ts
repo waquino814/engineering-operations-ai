@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { request } from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { claimPort } from './ports.ts';
 
 /**
  * `pnpm dev` and `pnpm ui:dev`: the local application and the console's dev server together, with
@@ -22,6 +23,23 @@ for (let i = 0; i < args.length; i++) {
     console.error(`unsupported argument "${args[i] ?? ''}"; supported: --port <n>`);
     process.exit(2);
   }
+}
+
+// Both ports are claimed before anything starts: free, or this repository's own previous
+// instance (stopped), or an error that names the holder. Nothing else is ever stopped.
+for (const [port, kind, label] of [
+  [Number(apiPort), 'api', 'the application'],
+  [Number(uiPort), 'ui', 'the console'],
+] as const) {
+  const claim = await claimPort(port, kind, root.replace(/\/$/, ''), label);
+  if (!claim.ok) {
+    console.error(claim.message);
+    process.exit(1);
+  }
+  for (const o of claim.stopped)
+    console.log(
+      `stopped a previous instance of ${label} (pid ${String(o.pid)}) that held port ${String(port)}`,
+    );
 }
 
 const children: ChildProcess[] = [];
@@ -64,14 +82,40 @@ const probe = () =>
     req.end();
   });
 
-const api = run('application', ['src/cli.ts', 'serve']);
-api.once('exit', (code) => {
-  if (!stopping && !ready)
-    console.error(`the application stopped during startup (exit ${String(code)})`);
-  stop(code ?? 1);
-});
-
+/**
+ * The application is supervised. A failure to start is fatal and shown (nothing else starts, so
+ * there is never a console with a permanently dead API behind it). Once it has been up, a crash
+ * or a stop restarts it after a short pause while the console stays up: the console shows
+ * "not reachable" meanwhile and its Retry works as soon as the application is back. A crash loop
+ * (more than five restarts in a minute) stops everything with an error.
+ */
 let ready = false as boolean;
+const restarts: number[] = [];
+function startApi(): void {
+  const api = run('application', ['src/cli.ts', 'serve']);
+  api.once('exit', (code, signal) => {
+    if (stopping) return;
+    if (!ready) {
+      console.error(`the application stopped during startup (exit ${String(code ?? signal)})`);
+      stop(code ?? 1);
+      return;
+    }
+    const now = Date.now();
+    restarts.push(now);
+    while (restarts.length > 0 && now - (restarts[0] ?? now) > 60_000) restarts.shift();
+    if (restarts.length > 5) {
+      console.error('the application keeps stopping; giving up');
+      stop(1);
+      return;
+    }
+    console.error(`the application stopped (${String(code ?? signal)}); restarting it`);
+    setTimeout(() => {
+      if (!stopping) startApi();
+    }, 500);
+  });
+}
+startApi();
+
 for (let i = 0; i < 100 && !ready && !stopping; i++) {
   ready = await probe();
   if (!ready) await new Promise((r) => setTimeout(r, 150));

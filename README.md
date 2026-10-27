@@ -21,10 +21,11 @@ pnpm install
 pnpm check                              # format, lint, typecheck, tests with coverage, console build
 pnpm validate-bundle <bundle-dir>       # validate a bundle; exit 0 valid, 1 invalid
 pnpm eval:synthetic                     # synthetic evaluation report; exit 1 on an answer leak
-pnpm dev                                # application (loopback :8787) + console (:5173); data in ~/.engineering-operations-ai
+pnpm dev  (= pnpm ui:dev [--port n])    # application (loopback :8787) + console (:5173); data in ~/.engineering-operations-ai.
+                                        # Frees its ports of this repo's own earlier dev server/application, never of anything else;
+                                        # restarts the application if it stops while the console stays up
 pnpm demo:seed                          # copy the synthetic bundles into the bundles directory (never overwrites)
 pnpm serve                              # the application alone (EOAI_PORT, EOAI_DATA_DIR, EOAI_BUNDLES_DIR, EOAI_RUNS_DIR override)
-pnpm ui:dev [--port n]                  # same as pnpm dev (it also starts the application); --port sets the console's port
 pnpm ui:vite                            # Vite alone (proxies /api to an application you started yourself)
 pnpm ui:build                           # build the console into dist/ui/
 pnpm fixtures:ui                        # regenerate the console's fixtures from the pipeline

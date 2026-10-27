@@ -139,6 +139,12 @@ async function serve(
       err.write(`${e.message}\n`);
       return 2;
     }
+    if ((e as NodeJS.ErrnoException).code === 'EADDRINUSE') {
+      err.write(
+        'that port is already in use on this machine: another process (possibly an earlier instance) is listening on it. Stop it, or use --port / EOAI_PORT.\n',
+      );
+      return 2;
+    }
     throw e;
   }
 }

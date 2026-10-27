@@ -1,4 +1,5 @@
 import { request } from 'node:http';
+import { createServer } from 'node:net';
 import { describe, expect, it } from 'vitest';
 import { main } from '../../src/cli.ts';
 import { ProviderError } from '../../src/investigation/provider.ts';
@@ -178,5 +179,22 @@ describe('cli serve', () => {
     expect(await main(argv, s.out, s.err, w.env(extra))).toBe(2);
     expect(s.text().out).toBe('');
     expect(s.text().err).not.toContain('sk-ant-secret');
+  });
+});
+
+describe('cli serve on a port that is taken', () => {
+  it('exits 2 with an explanation instead of a stack trace', async () => {
+    const w = await workspace();
+    const holder = createServer();
+    await new Promise<void>((r) => holder.listen(0, '127.0.0.1', r));
+    const port = (holder.address() as { port: number }).port;
+    try {
+      const s = streams();
+      expect(await main(['serve', '--port', String(port)], s.out, s.err, w.env())).toBe(2);
+      expect(s.text().err).toContain('already in use');
+      expect(s.text().out).toBe('');
+    } finally {
+      await new Promise((r) => holder.close(r));
+    }
   });
 });
