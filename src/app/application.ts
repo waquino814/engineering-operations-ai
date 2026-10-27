@@ -2,6 +2,7 @@ import { FakeProvider, type FakeStep } from '../investigation/fake-provider.ts';
 import type { ModelProvider } from '../investigation/provider.ts';
 import type { InvestigationResult } from '../investigation/result.ts';
 import { SimulatedProvider } from '../investigation/simulated-provider.ts';
+import { summarize } from '../investigation/summary.ts';
 import { createOllamaHttp, globalFetch, type FetchLike } from '../providers/ollama/client.ts';
 import { OllamaProvider } from '../providers/ollama/provider.ts';
 import { verifyLocalModel } from '../providers/ollama/verify.ts';
@@ -19,6 +20,7 @@ import {
   writeSettings,
   type Settings,
 } from './settings.ts';
+import { emitEvent, type EventSink } from './events.ts';
 import { checkCitations, type EvidenceReport } from './evidence.ts';
 import {
   compareStored,
@@ -57,6 +59,8 @@ export interface AppDeps {
   now?: () => number;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   signal?: AbortSignal;
+  /** Receives operational events (src/app/events.ts); none unless the operator asks for them. */
+  events?: EventSink;
 }
 
 export type StartOutcome =
@@ -193,6 +197,12 @@ export interface Application {
 export function createApplication(env: AppEnv, deps: AppDeps = {}): Application {
   const config = loadConfig(env);
   const now = deps.now ?? (() => Date.now());
+  const emit = (
+    event: Parameters<typeof emitEvent>[2],
+    fields: Parameters<typeof emitEvent>[3],
+  ) => {
+    emitEvent(deps.events, now, event, fields);
+  };
   // One scripted provider for the life of the application, so its steps are consumed across runs.
   const scripted =
     deps.fakeProvider ?? (deps.fakeSteps ? new FakeProvider(deps.fakeSteps, 'scripted') : null);
@@ -257,8 +267,10 @@ export function createApplication(env: AppEnv, deps: AppDeps = {}): Application 
     getProviderStatus: async () => (await status()).status,
     listEvaluationSuites,
     async startEvaluation(input, options = {}) {
-      if (!listEvaluationSuites().some((s) => s.id === input.suiteId))
+      if (!listEvaluationSuites().some((s) => s.id === input.suiteId)) {
+        emit('evaluation.refused', { reason: 'unknown_suite' });
         return { status: 'error', reason: 'unknown_suite' };
+      }
       let choice: ProviderChoice;
       if (input.provider === 'ollama') {
         // The same local-only check as an investigation, before anything is built or run.
@@ -267,24 +279,29 @@ export function createApplication(env: AppEnv, deps: AppDeps = {}): Application 
           ready = await status(options.signal, 'ollama');
         } catch (e) {
           if (!(e instanceof SettingsError)) throw e;
+          emit('evaluation.refused', { reason: 'provider_blocked' });
           return {
             status: 'refused',
             reason: 'provider_blocked',
             message: `${e.message}. Nothing was run.`,
           };
         }
-        if (config.pinned !== null && config.pinned !== 'ollama')
+        if (config.pinned !== null && config.pinned !== 'ollama') {
+          emit('evaluation.refused', { reason: 'provider_blocked' });
           return {
             status: 'refused',
             reason: 'provider_blocked',
             message: `The provider is fixed to ${config.pinned} outside the console, so an Ollama evaluation cannot be started. Nothing was run.`,
           };
-        if (ready.build === null)
+        }
+        if (ready.build === null) {
+          emit('evaluation.refused', { reason: 'provider_blocked' });
           return {
             status: 'refused',
             reason: 'provider_blocked',
             message: ready.status.reason ?? 'Ollama cannot run. Nothing was run.',
           };
+        }
         choice = { kind: 'real_model', provider: ready.build(), limits: LOCAL_LIMITS };
       } else if (input.provider === 'simulated') {
         choice = { kind: 'simulated', provider: new SimulatedProvider() };
@@ -298,7 +315,23 @@ export function createApplication(env: AppEnv, deps: AppDeps = {}): Application 
         clock: () => Date.now(),
         ...(signal ? { signal } : {}),
       });
-      return run === null ? { status: 'error', reason: 'unknown_suite' } : { status: 'done', run };
+      if (run === null) return { status: 'error', reason: 'unknown_suite' };
+      emit('evaluation.finished', {
+        evaluationId: run.id,
+        suiteId: run.suite.id,
+        suiteVersion: run.suite.version,
+        providerKind: run.provider.kind,
+        measuresModelQuality: run.measuresModelQuality,
+        status: run.status,
+        cases: run.reliability.cases,
+        completed: run.reliability.completed + run.reliability.inconclusive,
+        failed: run.reliability.failed + run.reliability.budgetExceeded,
+        notAdmitted: run.reliability.notAdmitted,
+        harnessErrors: run.reliability.harnessErrors,
+        answerLeaks: run.report.totals.answerLeaks,
+        durationMs: run.durationMs,
+      });
+      return { status: 'done', run };
     },
     listEvaluations: () => listEvaluations(config.evaluationsDir),
     getEvaluation: (id) => getEvaluation(config.evaluationsDir, id),
@@ -350,20 +383,26 @@ export function createApplication(env: AppEnv, deps: AppDeps = {}): Application 
         ready = await status(options.signal);
       } catch (e) {
         if (!(e instanceof SettingsError)) throw e;
+        emit('investigation.refused', { reason: 'provider_blocked' });
         return {
           status: 'refused',
           reason: 'provider_blocked',
           message: `${e.message}. Fix or remove it, then retry. Nothing was run.`,
         };
       }
-      if (ready.build === null)
+      if (ready.build === null) {
+        emit('investigation.refused', { reason: 'provider_blocked' });
         return {
           status: 'refused',
           reason: 'provider_blocked',
           message: ready.status.reason ?? 'The provider cannot run. Nothing was run.',
         };
+      }
       const found = await resolveBundle(config.bundlesDir, bundleId);
-      if (!found.ok) return { status: 'error', reason: found.reason };
+      if (!found.ok) {
+        emit('investigation.refused', { reason: found.reason });
+        return { status: 'error', reason: found.reason };
+      }
       const signals = [deps.signal, options.signal].flatMap((x) => (x ? [x] : []));
       const signal = signals.length > 0 ? AbortSignal.any(signals) : undefined;
       // runInvestigation validates the bundle before the provider can be called.
@@ -375,6 +414,24 @@ export function createApplication(env: AppEnv, deps: AppDeps = {}): Application 
         ...(signal ? { signal } : {}),
       });
       const runId = await saveRun(config.runsDir, result, now(), { bundleId });
+      const summary = summarize(result);
+      emit('investigation.finished', {
+        runId,
+        bundleId,
+        provider: result.run.provider,
+        model: result.run.model,
+        simulated: ready.status.simulated,
+        outcome: summary.outcome,
+        failureClass: summary.failureClass,
+        findings: summary.findings,
+        references: summary.references,
+        modelCalls: summary.usage.modelCalls,
+        repairs: summary.usage.repairAttempts,
+        retries: summary.usage.retries,
+        chargedTokens: summary.usage.chargedTokens,
+        tokenAccounting: summary.usage.tokenAccounting,
+        durationMs: summary.durationMs,
+      });
       return { status: 'done', runId, result };
     },
     listRuns: () => listRuns(config.runsDir),

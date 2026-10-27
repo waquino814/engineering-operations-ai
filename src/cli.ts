@@ -3,6 +3,7 @@ import { ContractError } from './intake/contract.ts';
 import { validateBundle } from './intake/validate-bundle.ts';
 import { AppConfigError } from './app/config.ts';
 import { createApplication, type AppDeps } from './app/application.ts';
+import { jsonLinesSink, type EventSink } from './app/events.ts';
 import { ProviderPolicyError, type AppEnv } from './app/provider-gate.ts';
 import {
   resolveListenHost,
@@ -24,7 +25,7 @@ import { withDataDefaults } from './app/data-dirs.ts';
 const USAGE = [
   'usage: node src/cli.ts validate <bundle-dir> [--json]',
   '       node src/cli.ts investigate <bundle-id> [--json]',
-  '       node src/cli.ts serve [--host <loopback-address>] [--port <n>]',
+  '       node src/cli.ts serve [--host <loopback-address>] [--port <n>] [--events stderr]',
 ].join('\n');
 
 /** Where the CLI writes; process.stdout and process.stderr satisfy it. */
@@ -90,12 +91,14 @@ async function serve(
 ): Promise<number> {
   let host: string | undefined;
   let port: number | undefined;
+  let events: EventSink | undefined;
   const fromEnv = env['EOAI_PORT'];
   if (fromEnv !== undefined && fromEnv !== '')
     port = /^\d{1,5}$/.test(fromEnv) ? Number(fromEnv) : -1;
   for (let i = 0; i < rest.length; i += 2) {
     const value = rest[i + 1];
     if (rest[i] === '--host' && value !== undefined) host = value;
+    else if (rest[i] === '--events' && value === 'stderr') events = jsonLinesSink(err);
     else if (rest[i] === '--port' && value !== undefined)
       port = /^\d{1,5}$/.test(value) ? Number(value) : -1;
     else {
@@ -107,7 +110,7 @@ async function serve(
     resolveListenHost(host);
     resolveListenPort(port);
     const { onServing } = deps;
-    const appDeps: AppDeps = { ...deps };
+    const appDeps: AppDeps = { ...deps, ...(events ? { events } : {}) };
     delete appDeps.signal;
     const withDirs = deps.home === undefined ? env : withDataDefaults(env, deps.home);
     const server = await startServer({
