@@ -59,6 +59,16 @@
         "citations": 3,
         "verified": 3
       },
+      "componentEvidence": {
+        "named": 2,
+        "identified": 1,
+        "unidentified": [
+          {
+            "finding": "F1",
+            "component": "payment-provider"
+          }
+        ]
+      },
       "resultValid": true,
       "answerLeak": {
         "checkedRequests": 1,
@@ -125,6 +135,11 @@
       "grounding": {
         "citations": 1,
         "verified": 1
+      },
+      "componentEvidence": {
+        "named": 1,
+        "identified": 1,
+        "unidentified": []
       },
       "resultValid": true,
       "answerLeak": {
@@ -194,6 +209,16 @@
         "citations": 3,
         "verified": 3
       },
+      "componentEvidence": {
+        "named": 2,
+        "identified": 1,
+        "unidentified": [
+          {
+            "finding": "F1",
+            "component": "payment-provider"
+          }
+        ]
+      },
       "resultValid": true,
       "answerLeak": {
         "checkedRequests": 1,
@@ -259,6 +284,16 @@
       "grounding": {
         "citations": 1,
         "verified": 1
+      },
+      "componentEvidence": {
+        "named": 1,
+        "identified": 0,
+        "unidentified": [
+          {
+            "finding": "F1",
+            "component": "payment-provider"
+          }
+        ]
       },
       "resultValid": true,
       "answerLeak": {
@@ -327,6 +362,16 @@
         "citations": 3,
         "verified": 3
       },
+      "componentEvidence": {
+        "named": 2,
+        "identified": 1,
+        "unidentified": [
+          {
+            "finding": "F1",
+            "component": "payment-provider"
+          }
+        ]
+      },
       "resultValid": true,
       "answerLeak": {
         "checkedRequests": 2,
@@ -393,6 +438,11 @@
         "citations": 0,
         "verified": 0
       },
+      "componentEvidence": {
+        "named": 0,
+        "identified": 0,
+        "unidentified": []
+      },
       "resultValid": true,
       "answerLeak": {
         "checkedRequests": 2,
@@ -455,6 +505,11 @@
       "grounding": {
         "citations": 0,
         "verified": 0
+      },
+      "componentEvidence": {
+        "named": 0,
+        "identified": 0,
+        "unidentified": []
       },
       "resultValid": true,
       "answerLeak": {
@@ -523,6 +578,16 @@
         "citations": 4,
         "verified": 4
       },
+      "componentEvidence": {
+        "named": 2,
+        "identified": 1,
+        "unidentified": [
+          {
+            "finding": "F1",
+            "component": "cache-node"
+          }
+        ]
+      },
       "resultValid": true,
       "answerLeak": {
         "checkedRequests": 1,
@@ -589,6 +654,11 @@
         "citations": 0,
         "verified": 0
       },
+      "componentEvidence": {
+        "named": 0,
+        "identified": 0,
+        "unidentified": []
+      },
       "resultValid": true,
       "answerLeak": {
         "checkedRequests": 3,
@@ -631,6 +701,7 @@
       "score": null,
       "rationale": [],
       "grounding": null,
+      "componentEvidence": null,
       "resultValid": true,
       "answerLeak": {
         "checkedRequests": 0,

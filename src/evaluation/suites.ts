@@ -28,6 +28,16 @@ export const SCENARIO_SPLIT: Readonly<Record<string, Split>> = Object.freeze({
   'synthetic-cache-saturation': 'held-out',
 });
 
+/**
+ * The seeds of each scenario that were used to build, tune or test this project's prompts,
+ * selection and scoring. A bundle with one of these seeds is not independent evidence for that
+ * scenario, whatever its other contents (src/evaluation/readiness.ts). A test requires every
+ * development bundle's seed to be listed here.
+ */
+export const TUNING_SEEDS: Readonly<Record<string, readonly number[]>> = Object.freeze({
+  'provider-outage': [42],
+});
+
 export const MISSING_FOR_FULL_HOLDOUT = [
   'Real Commerce Platform bundles for scenarios other than provider-outage (the repository holds one genuine excerpt: provider-outage, seed 42).',
   'New seeds of a real scenario, to hold out seeds rather than scenarios.',

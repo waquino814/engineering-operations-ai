@@ -182,6 +182,7 @@ describe('scoring', () => {
   const key = {
     scenario: 's',
     scenarioSeed: 7,
+    triggerOffsetMs: 30_000,
     rootCauseComponent: 'cache-node',
     affectedComponents: ['cache-node', 'orders-api'],
     primarySymptom: {
@@ -277,6 +278,7 @@ describe('scoring', () => {
     expect(key2).toMatchObject({
       scenario: 'synthetic-cache-saturation',
       scenarioSeed: 7,
+      triggerOffsetMs: 30_000,
       rootCauseComponent: 'cache-node',
       affectedComponents: ['cache-node', 'orders-api'],
       primarySymptom: {

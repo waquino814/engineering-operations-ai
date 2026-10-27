@@ -24,6 +24,58 @@ const metric = {
   },
 } as const;
 
+const score = {
+  type: 'object',
+  required: ['outcome', 'rootCause', 'symptomEvidence', 'affected'],
+  properties: {
+    outcome: { enum: ['completed', 'inconclusive', 'budget_exceeded', 'failed'] },
+    rootCause: { enum: ['correct', 'incorrect', 'missing', 'ambiguous'] },
+    symptomEvidence: { enum: ['covered', 'not_covered'] },
+    affected: {
+      type: 'object',
+      required: ['predicted', 'expected', 'precision', 'recall'],
+      properties: {
+        predicted: { type: 'array', items: { type: 'string' } },
+        expected: { type: 'array', items: { type: 'string' } },
+        precision: { type: ['number', 'null'], minimum: 0, maximum: 1 },
+        recall: { type: 'number', minimum: 0, maximum: 1 },
+      },
+    },
+  },
+} as const;
+
+const grounding = {
+  type: 'object',
+  required: ['citations', 'verified'],
+  properties: {
+    citations: { type: 'integer', minimum: 0 },
+    verified: { type: 'integer', minimum: 0 },
+  },
+} as const;
+
+const scenario = {
+  type: 'object',
+  required: ['name', 'seed'],
+  properties: { name: { type: 'string' }, seed: { type: 'integer' } },
+} as const;
+
+const componentEvidence = {
+  type: 'object',
+  required: ['named', 'identified', 'unidentified'],
+  properties: {
+    named: { type: 'integer', minimum: 0 },
+    identified: { type: 'integer', minimum: 0 },
+    unidentified: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['finding', 'component'],
+        properties: { finding: { type: 'string' }, component: { type: 'string' } },
+      },
+    },
+  },
+} as const;
+
 const caseReport = {
   type: 'object',
   required: [
@@ -47,10 +99,11 @@ const caseReport = {
       properties: { outcome: { type: 'string' } },
     },
     failure: { type: ['object', 'null'] },
-    scenario: { type: ['object', 'null'] },
-    score: { type: ['object', 'null'] },
+    scenario: { oneOf: [scenario, { type: 'null' }] },
+    score: { oneOf: [score, { type: 'null' }] },
     rationale: { type: 'array', items: { type: 'string' } },
-    grounding: { type: ['object', 'null'] },
+    grounding: { oneOf: [grounding, { type: 'null' }] },
+    componentEvidence: { oneOf: [componentEvidence, { type: 'null' }] },
     resultValid: { type: 'boolean' },
     answerLeak: {
       type: 'object',

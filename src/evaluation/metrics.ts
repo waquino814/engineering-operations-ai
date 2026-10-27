@@ -64,6 +64,9 @@ export function aggregateMetrics(cases: readonly CaseReport[]): Metric[] {
     expected += a.expected.length;
     hits += a.predicted.filter((p) => a.expected.includes(p)).length;
   }
+  const related = cases.flatMap((c) => (c.componentEvidence ? [c.componentEvidence] : []));
+  const named = related.reduce((n, r) => n + r.named, 0);
+  const identified = related.reduce((n, r) => n + r.identified, 0);
   const grounded = cases.flatMap((c) => (c.grounding ? [c.grounding] : []));
   const citations = grounded.reduce((n, g) => n + g.citations, 0);
   const verified = grounded.reduce((n, g) => n + g.verified, 0);
@@ -109,6 +112,13 @@ export function aggregateMetrics(cases: readonly CaseReport[]): Metric[] {
       'Citations in all findings that a second, independent read of the bundle confirms (record exists, identifiers match, file checksum unchanged), over all citations. Cases without findings contribute none.',
       verified,
       citations,
+    ),
+    rate(
+      'component_identified',
+      'Named components found in the cited records',
+      'Components that findings name (once per finding) that appear as a field value in at least one record the same finding cites, over components named. A descriptive count: it does not show that the records support the finding or that the component is the cause, and a true cause that the records only imply counts as not found.',
+      identified,
+      named,
     ),
     rate(
       'completion',

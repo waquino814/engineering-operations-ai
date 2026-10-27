@@ -7,6 +7,7 @@ import { summarize, type InvestigationSummary } from '../investigation/summary.t
 import { runInvestigation } from '../pipeline/run-investigation.ts';
 import { checkCitations } from '../app/evidence.ts';
 import { readAnswerKey } from './ground-truth.ts';
+import { componentEvidence, type ComponentEvidence } from './relations.ts';
 import { findLeaks, legitimateText, protectedValues, type LeakFinding } from './leakage.ts';
 import { explainScore, scoreResult, type Score } from './score.ts';
 
@@ -45,6 +46,13 @@ export interface CaseReport {
    * pipeline's own): `verified` of `citations`. Null when the bundle was not admitted.
    */
   grounding: { citations: number; verified: number } | null;
+  /**
+   * Whether each component a finding names appears as a field value in a record that finding
+   * cites (src/evaluation/relations.ts). A descriptive count, not a verdict: it neither shows
+   * that the records support the finding nor that the component is the cause. Null when the
+   * bundle was not admitted.
+   */
+  componentEvidence: ComponentEvidence | null;
   /** Wall-clock milliseconds, present only when the caller supplied a clock. */
   durationMs?: number;
   /** Whether the result passed `readInvestigationResult`. */
@@ -174,6 +182,7 @@ export async function evaluateCase(
             verified: rechecked.citations.filter((x) => x.status === 'verified').length,
           }
         : null,
+    componentEvidence: admitted ? await componentEvidence(c.bundleDir, result) : null,
     resultValid: readInvestigationResult(result).ok,
     answerLeak: {
       checkedRequests: provider.requests.length,

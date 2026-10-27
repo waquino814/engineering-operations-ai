@@ -1,8 +1,14 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { SimulatedProvider } from '../investigation/simulated-provider.ts';
-import { compareRuns } from './compare.ts';
 import { readEvaluationRun } from './document.ts';
+import {
+  baselineFindings,
+  baselineProblems,
+  formatFinding,
+  integrityFindings,
+  type GateFinding,
+} from './gate.ts';
 import { runSuite, type EvaluationRun, type ProviderChoice } from './run.ts';
 import { SplitViolation, SUITES, suiteById, type SuiteDefinition } from './suites.ts';
 
@@ -18,10 +24,13 @@ import { SplitViolation, SUITES, suiteById, type SuiteDefinition } from './suite
  * (ADR 0013), never from this command, so it can make no request and cannot spend anything.
  * Neither provider measures a model; the document says so in each run's `limitations`.
  *
- * The gate fails (exit 1) on an integrity problem, not on a wrong diagnosis: an answer leak, a
- * result that fails its contract, a run the harness could not complete, or, with `--baseline`, a
- * case that got worse than in an earlier document written by this command. Scripted suites contain
+ * The gate (src/evaluation/gate.ts) fails (exit 1) on an integrity problem, not on a wrong
+ * diagnosis: an answer leak, a result that fails its contract or schema, an inconsistent report, a
+ * missing or unexpected case, a citation the independent re-read does not confirm, a run the
+ * harness could not complete, or, with `--baseline`, a case or metric that got worse, a case that
+ * appeared or vanished, or a moved development / held-out split. Scripted suites contain
  * deliberately wrong and fabricated diagnoses, so a wrong root cause is an expected outcome there.
+ * A baseline that is itself damaged, inconsistent, incomplete or ambiguous is an input error.
  *
  * Exit codes: 0 gate passed, 1 gate failed, 2 usage or input error, 3 split violation (the
  * development / held-out separation was breached; nothing is reported as a result).
@@ -32,7 +41,11 @@ export const USAGE =
 export interface SuiteDocument {
   schemaVersion: '0.1.0';
   runs: EvaluationRun[];
-  gate: { passed: boolean; problems: string[] };
+  /**
+   * `problems` are the findings as sentences, for people; `findings` carry the same facts as
+   * fields (code, suite, case, metric, reason, baseline and current value), for machines.
+   */
+  gate: { passed: boolean; problems: string[]; findings: GateFinding[] };
 }
 
 export interface Writer {
@@ -84,64 +97,27 @@ function parse(args: readonly string[]): Options | string {
   return options;
 }
 
-/** Integrity problems of one run; wrong diagnoses are not problems (see the file comment). */
-function integrityProblems(run: EvaluationRun): string[] {
-  const where = `${run.suite.id}@${run.suite.version}`;
-  const problems: string[] = [];
-  if (run.report.totals.answerLeaks > 0)
-    problems.push(`${where}: ${String(run.report.totals.answerLeaks)} case(s) leaked answer text`);
-  const invalid = run.report.cases.filter((c) => !c.resultValid).map((c) => c.id);
-  if (invalid.length > 0)
-    problems.push(`${where}: result fails its contract in ${invalid.join(', ')}`);
-  if (run.status === 'incomplete')
-    problems.push(
-      `${where}: incomplete (${String(run.harnessErrors.length)} case(s) the harness could not evaluate)`,
-    );
-  return problems;
-}
-
-type Baseline = { ok: true; runs: EvaluationRun[] } | { ok: false; problem: string };
+type Baseline = { ok: true; runs: EvaluationRun[] } | { ok: false; problems: string[] };
 
 async function readBaseline(file: string): Promise<Baseline> {
+  const fail = (problem: string): Baseline => ({ ok: false, problems: [problem] });
   let value: unknown;
   try {
     value = JSON.parse(await readFile(file, 'utf8'));
   } catch {
-    return { ok: false, problem: 'the baseline file cannot be read as JSON' };
+    return fail('the baseline file cannot be read as JSON');
   }
   const raw = (value as { runs?: unknown } | null)?.runs;
-  if (!Array.isArray(raw)) return { ok: false, problem: 'the baseline holds no "runs" array' };
+  if (!Array.isArray(raw)) return fail('the baseline holds no "runs" array');
   const runs: EvaluationRun[] = [];
   for (const r of raw as unknown[]) {
     const read = readEvaluationRun(r);
-    if (!read.ok) return { ok: false, problem: 'the baseline holds a run that fails its schema' };
+    if (!read.ok) return fail('the baseline holds a run that fails its schema');
     runs.push(read.run);
   }
-  return { ok: true, runs };
-}
-
-function regressionProblems(runs: readonly EvaluationRun[], baseline: EvaluationRun[]): string[] {
-  const problems: string[] = [];
-  for (const run of runs) {
-    const before = baseline.find(
-      (b) =>
-        b.suite.id === run.suite.id &&
-        b.suite.version === run.suite.version &&
-        b.provider.kind === run.provider.kind,
-    );
-    if (before === undefined) {
-      problems.push(
-        `${run.suite.id}@${run.suite.version}: the baseline has no ${run.provider.kind} run of this suite`,
-      );
-      continue;
-    }
-    const c = compareRuns(before, run);
-    // A suite and version match was checked above, so only a comparison is returned.
-    if (c === 'different_suite') continue;
-    for (const k of c.cases.filter((x) => x.change !== 'unchanged' && x.change !== 'improved'))
-      problems.push(`${run.suite.id}@${run.suite.version}: case ${k.id} is ${k.change}`);
-  }
-  return problems;
+  // A baseline that cannot stand for a full, consistent suite would let a regression pass.
+  const unusable = baselineProblems(runs);
+  return unusable.length > 0 ? { ok: false, problems: unusable } : { ok: true, runs };
 }
 
 export async function main(
@@ -159,7 +135,7 @@ export async function main(
   if (parsed.baseline !== undefined) {
     const read = await readBaseline(parsed.baseline);
     if (!read.ok) {
-      err.write(`${read.problem}\n`);
+      for (const problem of read.problems) err.write(`${problem}\n`);
       return 2;
     }
     baseline = read.runs;
@@ -189,14 +165,15 @@ export async function main(
     }
     throw e;
   }
-  const problems = [
-    ...runs.flatMap(integrityProblems),
-    ...(baseline === undefined ? [] : regressionProblems(runs, baseline)),
+  const findings = [
+    ...runs.flatMap(integrityFindings),
+    ...(baseline === undefined ? [] : baselineFindings(runs, baseline)),
   ];
+  const problems = findings.map(formatFinding);
   const document: SuiteDocument = {
     schemaVersion: '0.1.0',
     runs,
-    gate: { passed: problems.length === 0, problems },
+    gate: { passed: findings.length === 0, problems, findings },
   };
   const text = `${JSON.stringify(document, null, 2)}\n`;
   if (parsed.out === undefined) out.write(text);

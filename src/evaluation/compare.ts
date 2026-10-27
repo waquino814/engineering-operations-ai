@@ -30,8 +30,13 @@ export interface Comparison {
   improvements: number;
 }
 
-const ROOT_RANK: Record<string, number> = { correct: 3, ambiguous: 2, incorrect: 1, missing: 0 };
-const OUTCOME_RANK: Record<string, number> = {
+export const ROOT_RANK: Record<string, number> = {
+  correct: 3,
+  ambiguous: 2,
+  incorrect: 1,
+  missing: 0,
+};
+export const OUTCOME_RANK: Record<string, number> = {
   completed: 2,
   inconclusive: 1,
   failed: 0,

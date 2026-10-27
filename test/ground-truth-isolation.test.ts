@@ -298,9 +298,12 @@ describe('the source tree', () => {
     // The console's fixture generator validates its fixture bundles (ADR 0011); it never opens
     // evidence for an investigation itself, which runs through the pipeline. The application layer
     // validates a bundle for the operator (ADR 0012); its report never reaches the investigator.
+    // The evaluation-input check (`pnpm eval:readiness`) validates a received bundle before it is
+    // used for evaluation; it lives in src/evaluation/ and its report goes to the operator only.
     expect(importers.sort()).toEqual([
       'app/application.ts',
       'cli.ts',
+      'evaluation/readiness.ts',
       'evaluation/ui-fixtures.ts',
       'index.ts',
       'pipeline/run-investigation.ts',

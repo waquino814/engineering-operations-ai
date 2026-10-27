@@ -13,6 +13,8 @@ export interface AnswerKey {
   scenarioSeed: number;
   rootCauseComponent: string;
   affectedComponents: string[];
+  /** When the producer started the fault, in milliseconds after load start. */
+  triggerOffsetMs: number;
   /** The metric series that shows the fault, as the bundle contract states it. */
   primarySymptom: { metric: string; matchers: Record<string, string> };
 }
@@ -32,6 +34,7 @@ export async function readAnswerKey(bundleDir: string): Promise<AnswerKey> {
     scenarioSeed: scenario.seed,
     rootCauseComponent: rootCause.component,
     affectedComponents: [...(value.affectedComponents as string[])].sort(),
+    triggerOffsetMs: (value.timeline as { triggerOffsetMs: number }).triggerOffsetMs,
     primarySymptom: {
       metric: (value.primarySymptom as { metric: string }).metric,
       matchers: (value.primarySymptom as { matchers: Record<string, string> }).matchers,

@@ -38,6 +38,7 @@ function report(
       : null,
     rationale: [],
     grounding: admitted ? { citations: 2, verified: 2 } : null,
+    componentEvidence: admitted ? { named: 1, identified: 1, unidentified: [] } : null,
     resultValid: true,
     answerLeak: {
       checkedRequests: 1,
@@ -104,6 +105,20 @@ describe('aggregate metrics', () => {
       denominator: 3,
       value: 0.667,
     });
+  });
+
+  it('counts named components found in cited records as a rate over components named, never as support', () => {
+    const ms = aggregateMetrics([
+      report({ componentEvidence: { named: 3, identified: 1, unidentified: [] } }),
+      report({ componentEvidence: { named: 1, identified: 1, unidentified: [] } }),
+      report({ score: null, grounding: null, componentEvidence: null }),
+    ]);
+    const m = get(ms, 'component_identified');
+    expect(m).toMatchObject({ numerator: 2, denominator: 4, value: 0.5, status: 'scored' });
+    expect(m.definition).toContain('does not show that the records support the finding');
+    expect(
+      get(aggregateMetrics([report({ componentEvidence: null })]), 'component_identified'),
+    ).toMatchObject({ status: 'not_applicable', value: null });
   });
 
   it('counts re-verified citations over all citations, and says not applicable rather than zero when there are none', () => {

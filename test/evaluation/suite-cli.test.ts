@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readEvaluationRun } from '../../src/evaluation/document.ts';
 import { runSuite, type EvaluationRun } from '../../src/evaluation/run.ts';
+import { reaggregate } from './support.ts';
 import { SplitViolation } from '../../src/evaluation/suites.ts';
 import {
   isEntryPoint,
@@ -45,7 +46,7 @@ describe('the suite evaluation command', () => {
     const { code, out, err } = await invoke(['all']);
     expect([code, err]).toEqual([0, '']);
     const doc = document(out);
-    expect(doc.gate).toEqual({ passed: true, problems: [] });
+    expect(doc.gate).toEqual({ passed: true, problems: [], findings: [] });
     expect(doc.runs.map((r) => [r.suite.id, r.suite.split, r.provider.kind])).toEqual([
       ['development', 'development', 'scripted'],
       ['held-out', 'held-out', 'scripted'],
@@ -186,6 +187,34 @@ describe('the suite evaluation command', () => {
       expect(err).toContain('held-out@1');
     });
 
+    it('fails, with the reason, on a run that no longer satisfies its schema', async () => {
+      const { code, err, out } = await invoke(
+        ['held-out'],
+        steady({
+          run: tamper((r) => {
+            (r as unknown as { metrics?: unknown }).metrics = undefined;
+          }),
+        }),
+      );
+      expect(code).toBe(1);
+      expect(err).toContain('held-out@1: the run fails its schema');
+      expect(document(out).gate.findings[0]).toMatchObject({ code: 'run_schema_invalid' });
+    });
+
+    it('fails when a scripted suite loses a case it defines, and when a report no longer follows from its cases', async () => {
+      const { code, err } = await invoke(
+        ['held-out'],
+        steady({
+          run: tamper((r) => {
+            r.report.cases = r.report.cases.slice(1);
+          }),
+        }),
+      );
+      expect(code).toBe(1);
+      expect(err).toContain('case fabricated-correct is defined by the suite but has no report');
+      expect(err).toContain('do not match its case reports');
+    });
+
     it('exits 3 and reports no result when the development / held-out split is breached', async () => {
       const { code, err, out } = await invoke(
         ['all'],
@@ -232,6 +261,7 @@ describe('the suite evaluation command', () => {
       const wrong = base.runs[0]?.report.cases.find((c) => c.id === 'excerpt-wrong-root-cause');
       if (!wrong?.score) throw new Error('fixture changed');
       wrong.score.rootCause = 'correct';
+      reaggregate(base.runs[0] as EvaluationRun);
       await writeFile(file, JSON.stringify(base));
       const { code, err, out } = await invoke(['development', '--baseline', file]);
       expect(code).toBe(1);
@@ -245,6 +275,7 @@ describe('the suite evaluation command', () => {
       const right = base.runs[0]?.report.cases.find((c) => c.id === 'excerpt-correct');
       if (!right?.score) throw new Error('fixture changed');
       right.score.rootCause = 'incorrect';
+      reaggregate(base.runs[0] as EvaluationRun);
       await writeFile(file, JSON.stringify(base));
       expect((await invoke(['development', '--baseline', file])).code).toBe(0);
     });
@@ -258,6 +289,95 @@ describe('the suite evaluation command', () => {
       const simulated = await invoke(['held-out', '--provider', 'simulated', '--baseline', file]);
       expect(simulated.code).toBe(1);
       expect(simulated.err).toContain('the baseline has no simulated run of this suite');
+    });
+
+    it('cannot pass when the run lacks a case the baseline has, and says which', async () => {
+      const file = join(dir, 'baseline.json');
+      await invoke(['held-out', '--out', file]);
+      const { code, err, out } = await invoke(
+        ['held-out', '--baseline', file],
+        steady({
+          run: async (suite, options) => {
+            const run = await runSuite(suite, options);
+            run.report.cases = run.report.cases.filter((c) => c.id !== 'fabricated-correct');
+            return reaggregate(run);
+          },
+        }),
+      );
+      expect(code).toBe(1);
+      expect(err).toContain(
+        'held-out@1: case fabricated-correct is in the baseline but missing from this run',
+      );
+      // The same facts are present as fields.
+      expect(document(out).gate.findings).toContainEqual(
+        expect.objectContaining({
+          code: 'case_missing',
+          suite: 'held-out@1',
+          case: 'fabricated-correct',
+        }),
+      );
+    });
+
+    it('fails on a metric that got worse and names it, with the case-level cause', async () => {
+      const file = join(dir, 'baseline.json');
+      const base = document((await invoke(['development'])).out);
+      for (const c of base.runs[0]?.report.cases ?? []) if (c.score) c.score.rootCause = 'correct';
+      reaggregate(base.runs[0] as EvaluationRun);
+      await writeFile(file, JSON.stringify(base));
+      const { code, err } = await invoke(['development', '--baseline', file]);
+      expect(code).toBe(1);
+      expect(err).toContain('development@1: metric root_cause_correct fell from');
+      expect(err).toContain('case excerpt-wrong-root-cause is regressed: root_cause_correct');
+    });
+
+    it('fails when the development / held-out split moved since the baseline', async () => {
+      const file = join(dir, 'baseline.json');
+      const base = document((await invoke(['development'])).out);
+      (base.runs[0] as EvaluationRun).suite.split = 'held-out';
+      await writeFile(file, JSON.stringify(base));
+      const { code, err } = await invoke(['development', '--baseline', file]);
+      expect(code).toBe(1);
+      expect(err).toContain('the suite was held-out in the baseline and is development now');
+    });
+
+    it('says when the baseline was recorded for another version of the suite', async () => {
+      const file = join(dir, 'baseline.json');
+      const base = document((await invoke(['held-out'])).out);
+      (base.runs[0] as EvaluationRun).suite.version = '0';
+      await writeFile(file, JSON.stringify(base));
+      const { code, err } = await invoke(['held-out', '--baseline', file]);
+      expect(code).toBe(1);
+      expect(err).toContain('the baseline records version 0 of this suite; this run is version 1');
+    });
+
+    it.each([
+      [
+        'is hand-edited so its totals no longer follow from its cases',
+        (r: EvaluationRun) => (r.report.totals.cases += 1),
+        'internally inconsistent (report.totals)',
+      ],
+      [
+        'is an incomplete run',
+        (r: EvaluationRun) => (r.status = 'incomplete'),
+        'is incomplete, so it cannot stand for a full suite',
+      ],
+    ])('refuses a baseline that %s, as an input error, running nothing', async (_n, edit, msg) => {
+      const file = join(dir, 'baseline.json');
+      const base = document((await invoke(['held-out'])).out);
+      edit(base.runs[0] as EvaluationRun);
+      await writeFile(file, JSON.stringify(base));
+      let ran = 0;
+      const { code, err } = await invoke(
+        ['held-out', '--baseline', file],
+        steady({
+          run: (s, o) => {
+            ran++;
+            return runSuite(s, o);
+          },
+        }),
+      );
+      expect([code, ran]).toEqual([2, 0]);
+      expect(err).toContain(msg);
     });
 
     it.each([

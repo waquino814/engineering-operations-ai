@@ -38,12 +38,15 @@ const MAX_FILE_BYTES = 64 * 1024 * 1024;
 const isTelemetry = (f: string): f is TelemetryFile =>
   (TELEMETRY_FILES as readonly string[]).includes(f);
 
-interface Loaded {
+export interface Loaded {
   sha256: string;
   lines: string[];
 }
 
-async function load(bundleDir: string, file: TelemetryFile): Promise<Loaded | null> {
+export async function loadTelemetry(
+  bundleDir: string,
+  file: TelemetryFile,
+): Promise<Loaded | null> {
   try {
     const path = join(bundleDir, file);
     const info = await lstat(path);
@@ -71,7 +74,7 @@ export async function checkCitations(
       if (!isTelemetry(ref.file))
         // The schema allows only telemetry files; anything else is never opened.
         throw new Error('a citation names a file that is not telemetry');
-      if (!loaded.has(ref.file)) loaded.set(ref.file, await load(bundleDir, ref.file));
+      if (!loaded.has(ref.file)) loaded.set(ref.file, await loadTelemetry(bundleDir, ref.file));
       const file = loaded.get(ref.file) ?? null;
       const expected = result.bundle.files[ref.file].sha256;
       if (file === null) {
