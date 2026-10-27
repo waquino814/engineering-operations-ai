@@ -10,6 +10,7 @@ import { validatorsFor } from '../intake/contract.ts';
  */
 export interface AnswerKey {
   scenario: string;
+  scenarioSeed: number;
   rootCauseComponent: string;
   affectedComponents: string[];
   /** The metric series that shows the fault, as the bundle contract states it. */
@@ -24,10 +25,11 @@ export async function readAnswerKey(bundleDir: string): Promise<AnswerKey> {
   const validators = await validatorsFor(1);
   if (!validators['ground-truth'](value))
     throw new Error(`${GROUND_TRUTH_FILE} does not match its schema`);
-  const scenario = value.scenario as { name: string };
+  const scenario = value.scenario as { name: string; seed: number };
   const rootCause = value.rootCause as { component: string; summary: string };
   return {
     scenario: scenario.name,
+    scenarioSeed: scenario.seed,
     rootCauseComponent: rootCause.component,
     affectedComponents: [...(value.affectedComponents as string[])].sort(),
     primarySymptom: {

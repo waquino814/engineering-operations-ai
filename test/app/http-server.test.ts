@@ -619,6 +619,180 @@ describe('investigations', () => {
   });
 });
 
+describe('evaluations', () => {
+  const put = (server: RunningServer, body: unknown, headers: Record<string, string> = {}) =>
+    call(server, 'POST', '/api/evaluations', {
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+      headers: { 'content-type': 'application/json', ...headers },
+    });
+  interface Ev {
+    suites: { id: string; split: string }[];
+    evaluations: { id: string; ok: boolean; provider: { kind: string } }[];
+    evaluation: {
+      id: string;
+      provider: { kind: string; simulated: boolean };
+      measuresModelQuality: boolean;
+    };
+    id: string;
+    regressions: number;
+    sameProvider: boolean;
+  }
+  const json = (r: { json(): unknown }): Ev => r.json() as Ev;
+
+  it('lists suites, runs one, stores it, and reopens and compares stored evaluations', async () => {
+    const { server } = await serve({ steps: 'none' });
+    try {
+      expect(
+        json(await call(server, 'GET', '/api/evaluation-suites')).suites.map((s) => [
+          s.id,
+          s.split,
+        ]),
+      ).toEqual([
+        ['development', 'development'],
+        ['held-out', 'held-out'],
+      ]);
+      expect(json(await call(server, 'GET', '/api/evaluations')).evaluations).toEqual([]);
+      const a = await put(server, { suiteId: 'development', provider: 'scripted' });
+      const b = await put(server, { suiteId: 'development', provider: 'simulated' });
+      expect([a.status, b.status]).toEqual([201, 201]);
+      const [ida, idb] = [json(a).id, json(b).id];
+      const list = json(await call(server, 'GET', '/api/evaluations')).evaluations;
+      expect(list.map((e) => e.provider.kind).sort()).toEqual(['scripted', 'simulated']);
+      const got = json(await call(server, 'GET', `/api/evaluations/${ida}`)).evaluation;
+      expect(got).toMatchObject({
+        id: ida,
+        provider: { kind: 'scripted', simulated: true },
+        measuresModelQuality: false,
+      });
+      const cmp = json(await call(server, 'GET', `/api/evaluations/${ida}/compare/${idb}`));
+      expect(cmp.sameProvider).toBe(false);
+      expect((await call(server, 'GET', `/api/evaluations/${ida}/compare/${ida}`)).status).toBe(
+        200,
+      );
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects malformed requests, unknown suites and ids, and refuses cross-origin starts', async () => {
+    const { server } = await serve({ steps: 'none' });
+    try {
+      for (const bad of [
+        '{oops',
+        '[]',
+        '{}',
+        '{"suiteId":"development"}',
+        '{"suiteId":1,"provider":"scripted"}',
+        '{"suiteId":"development","provider":"anthropic"}',
+        '{"suiteId":"development","provider":"local"}',
+        '{"suiteId":"development","provider":"scripted","x":1}',
+      ])
+        expect([bad, (await put(server, bad)).status]).toEqual([bad, 400]);
+      expect((await put(server, { suiteId: 'nope', provider: 'scripted' })).json().error.code).toBe(
+        'unknown_suite',
+      );
+      expect(
+        (
+          await put(
+            server,
+            { suiteId: 'development', provider: 'scripted' },
+            { origin: 'http://evil.example' },
+          )
+        ).status,
+      ).toBe(403);
+      expect((await call(server, 'GET', '/api/evaluations/..%2fx')).status).toBe(400);
+      expect(
+        (await call(server, 'GET', '/api/evaluations/20250101T000000Z-development-scripted'))
+          .status,
+      ).toBe(404);
+      expect(
+        (
+          await call(
+            server,
+            'GET',
+            '/api/evaluations/..%2fx/compare/20250101T000000Z-development-scripted',
+          )
+        ).status,
+      ).toBe(400);
+      expect((await call(server, 'PUT', '/api/evaluations')).status).toBe(405);
+      expect((await call(server, 'POST', '/api/evaluation-suites')).status).toBe(405);
+      expect(
+        (await call(server, 'POST', '/api/evaluations/20250101T000000Z-development-scripted'))
+          .status,
+      ).toBe(405);
+      // Nothing was stored by any of the above.
+      expect(json(await call(server, 'GET', '/api/evaluations')).evaluations).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('cannot start an Ollama evaluation while the runtime reports cloud features enabled', async () => {
+    const w = await workspace();
+    const stub = ollamaStub({ status: { body: { cloud: { disabled: false, source: 'none' } } } });
+    const server = await startServer({
+      env: w.env(),
+      port: 0,
+      appDeps: { ollamaFetch: stub.fetch },
+    });
+    try {
+      const r = await put(server, { suiteId: 'held-out', provider: 'ollama' });
+      expect(r.status).toBe(409);
+      expect(r.json().error.code).toBe('provider_blocked');
+      expect(r.json().error.message).toContain('OLLAMA_NO_CLOUD=1');
+      expect(stub.calls.some((c) => c.path === '/api/chat')).toBe(false);
+      expect(json(await call(server, 'GET', '/api/evaluations')).evaluations).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('reports a damaged stored evaluation without leaking its content', async () => {
+    const { w, server } = await serve({ steps: 'none' });
+    try {
+      const dir = join(w.runsDir, '..', 'evaluations');
+      await mkdir(dir, { recursive: true });
+      await writeFile(
+        join(dir, '20260101T000000Z-development-scripted.json'),
+        '{"secret":"hunter2"}',
+      );
+      const r = await call(server, 'GET', '/api/evaluations/20260101T000000Z-development-scripted');
+      expect([r.status, r.json().error.code]).toEqual([500, 'evaluation_unreadable']);
+      expect(r.text).not.toContain('hunter2');
+      const compare = await call(
+        server,
+        'GET',
+        '/api/evaluations/20260101T000000Z-development-scripted/compare/20260101T000000Z-development-scripted',
+      );
+      expect(compare.status).toBe(500);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('runs one evaluation at a time with investigations, answering the second with busy', async () => {
+    const w = await workspace();
+    const server = await startServer({
+      env: w.env(),
+      port: 0,
+      appDeps: { fakeSteps: [{ hang: true }] },
+    });
+    try {
+      const first = post(server, { bundleId: w.excerptId });
+      let busy;
+      for (let i = 0; i < 100 && busy?.status !== 429; i++) {
+        busy = await put(server, { suiteId: 'held-out', provider: 'scripted' });
+        if (busy.status !== 429) await new Promise((r) => setTimeout(r, 20));
+      }
+      expect(busy?.status).toBe(429);
+      await server.close();
+      await first;
+    } finally {
+      await server.close();
+    }
+  });
+});
+
 describe('static console and shutdown', () => {
   it('serves a built console by exact path only', async () => {
     const dir = await tempDir();

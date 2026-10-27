@@ -23,7 +23,11 @@ export function withDataDefaults(env: AppEnv, home: string): AppEnv {
     ...env,
     EOAI_BUNDLES_DIR: env['EOAI_BUNDLES_DIR'] || join(root, 'bundles'),
     EOAI_RUNS_DIR: env['EOAI_RUNS_DIR'] || join(root, 'runs'),
-    EOAI_SETTINGS_FILE: env['EOAI_SETTINGS_FILE'] || join(root, 'settings.json'),
+    // Beside an explicit runs directory the settings file follows it (see loadConfig), so a
+    // test or an operator who sets the directories never reads the user's own settings.
+    ...(env['EOAI_SETTINGS_FILE'] || env['EOAI_RUNS_DIR']
+      ? {}
+      : { EOAI_SETTINGS_FILE: join(root, 'settings.json') }),
   };
 }
 

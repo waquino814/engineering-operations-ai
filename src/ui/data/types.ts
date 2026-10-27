@@ -81,6 +81,124 @@ export interface ProviderStatus {
   reason: string | null;
 }
 
+/** An evaluation suite the application can run (E7). */
+export interface EvaluationSuite {
+  id: string;
+  version: string;
+  split: 'development' | 'held-out';
+  description: string;
+  cases: { id: string; scenario: string }[];
+}
+
+export type EvaluationProviderChoice = 'scripted' | 'simulated' | 'ollama';
+
+export interface EvaluationMetric {
+  id: string;
+  label: string;
+  definition: string;
+  numerator: number | null;
+  denominator: number;
+  value: number | null;
+  status: 'scored' | 'not_applicable' | 'not_scored';
+  note?: string;
+}
+
+export interface EvaluationCaseView {
+  id: string;
+  summary: { outcome: string; failureClass: string | null };
+  failure: { class: string; message: string } | null;
+  scenario: { name: string; seed: number } | null;
+  score: {
+    rootCause: string;
+    symptomEvidence: string;
+    affected: { predicted: string[]; expected: string[] };
+  } | null;
+  rationale: string[];
+  grounding: { citations: number; verified: number } | null;
+  resultValid: boolean;
+  answerLeak: { leaked: boolean };
+  durationMs?: number;
+}
+
+/** A stored evaluation run, as the console reads it. */
+export interface EvaluationDetailView {
+  id: string;
+  suite: {
+    id: string;
+    version: string;
+    split: 'development' | 'held-out';
+    synthetic: boolean;
+    description: string;
+  };
+  provider: {
+    kind: 'scripted' | 'simulated' | 'real_model';
+    provider: string;
+    model: string;
+    simulated: boolean;
+  };
+  measuresModelQuality: boolean;
+  startedAt: string;
+  durationMs: number;
+  status: 'complete' | 'incomplete';
+  report: { cases: EvaluationCaseView[] };
+  metrics: EvaluationMetric[];
+  scenarios: {
+    scenario: string | null;
+    seed: number | null;
+    cases: string[];
+    metrics: EvaluationMetric[];
+  }[];
+  reliability: {
+    cases: number;
+    completed: number;
+    inconclusive: number;
+    failed: number;
+    budgetExceeded: number;
+    notAdmitted: number;
+    timeouts: number;
+    harnessErrors: number;
+    failuresByClass: Record<string, number>;
+  };
+  harnessErrors: { id: string; error: string }[];
+  limitations: string[];
+}
+
+export type EvaluationEntryView =
+  | {
+      id: string;
+      ok: true;
+      suite: EvaluationDetailView['suite'];
+      provider: EvaluationDetailView['provider'];
+      measuresModelQuality: boolean;
+      startedAt: string;
+      status: 'complete' | 'incomplete';
+      headline: { cases: number; rootCauseCorrect: string; completion: string };
+    }
+  | { id: string; ok: false; problems: string[] };
+
+export interface EvaluationComparisonView {
+  suite: { id: string; version: string };
+  a: { id: string; provider: EvaluationDetailView['provider'] };
+  b: { id: string; provider: EvaluationDetailView['provider'] };
+  sameProvider: boolean;
+  metrics: {
+    id: string;
+    label: string;
+    a: number | null;
+    b: number | null;
+    delta: number | null;
+  }[];
+  cases: { id: string; change: string; a: string | null; b: string | null }[];
+  regressions: number;
+  improvements: number;
+}
+
+export type EvaluationStartOutcome =
+  | { status: 'started'; id: string }
+  /** The provider cannot run (for Ollama, the local-only check); nothing was run or stored. */
+  | { status: 'refused'; message: string }
+  | { status: 'error'; message: string };
+
 /** A saved result's citation, re-checked against the original bundle (never rerunning a model). */
 export interface CitationCheck {
   findingId: string;
@@ -115,6 +233,14 @@ export interface InvestigationDataSource {
   readonly description: { mode: Origin; notice: string };
   getProviderStatus(): Promise<ProviderStatus>;
   getSettings(): Promise<ProviderSettings>;
+  listEvaluationSuites(): Promise<EvaluationSuite[]>;
+  listEvaluations(): Promise<EvaluationEntryView[]>;
+  getEvaluation(id: string): Promise<EvaluationDetailView | null>;
+  startEvaluation(input: {
+    suiteId: string;
+    provider: EvaluationProviderChoice;
+  }): Promise<EvaluationStartOutcome>;
+  compareEvaluations(a: string, b: string): Promise<EvaluationComparisonView>;
   /** Re-checks the citations of a saved investigation and returns the cited text. */
   getEvidence(id: string): Promise<EvidenceReport>;
   /** Rejects when the application refuses the choice; never falls back to another provider. */

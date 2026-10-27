@@ -61,6 +61,7 @@ describe('module boundaries', () => {
     expect(fsUsers).toEqual([
       'app/bundles.ts',
       'app/data-dirs.ts',
+      'app/evaluation-service.ts',
       'app/evidence.ts',
       'app/http-server.ts',
       'app/run-store.ts',
@@ -68,6 +69,7 @@ describe('module boundaries', () => {
       'evaluation/cli.ts',
       'evaluation/ground-truth.ts',
       'evaluation/leakage.ts',
+      'evaluation/suites.ts',
       'evaluation/synthetic.ts',
       'evaluation/ui-fixtures.ts',
       'intake/checks.ts',
@@ -149,12 +151,57 @@ describe('module boundaries', () => {
   it('keeps scoring code out of everything but evaluation', async () => {
     for (const { file, text } of await sources()) {
       if (file.startsWith('evaluation/')) continue;
-      expect(
-        imports(text).filter((s) => s.includes('evaluation')),
-        file,
-      ).toEqual([]);
+      // The one place the application layer touches the evaluation package (E7).
+      const evaluationImports = imports(text).filter((s) => /(^|\/)evaluation\//.test(s));
+      expect(evaluationImports.length > 0, file).toBe(
+        file === join('app', 'evaluation-service.ts'),
+      );
       expect(text, file).not.toMatch(/scoreResult|AnswerKey|protectedValues|findLeaks/);
     }
+  });
+
+  it('keeps the held-out scenario’s identifiers out of every module that builds prompts, selects evidence or runs providers', async () => {
+    // Identifiers of the invented held-out scenario (src/evaluation/suites.ts). If any of them
+    // appears in the code that shapes what a model sees, the split no longer holds.
+    const heldOut = /synthetic-cache-saturation|cache-node|cache_requests_total/;
+    for (const { file, text } of await sources()) {
+      if (file.startsWith('evaluation/')) continue;
+      expect(text, file).not.toMatch(heldOut);
+    }
+  });
+
+  it('lets the development and held-out suites share no scenario, seed or telemetry file', async () => {
+    const { SUITES, SCENARIO_SPLIT, buildSuite } = await import('../src/evaluation/suites.ts');
+    const { readAnswerKey } = await import('../src/evaluation/ground-truth.ts');
+    const { createHash } = await import('node:crypto');
+    const seen = { development: new Set<string>(), 'held-out': new Set<string>() };
+    const identity = { development: new Set<string>(), 'held-out': new Set<string>() };
+    for (const suite of SUITES) {
+      const built = await buildSuite(suite);
+      try {
+        for (const b of built.bundles) {
+          const key = await readAnswerKey(b.dir);
+          expect(SCENARIO_SPLIT[key.scenario], key.scenario).toBe(suite.split);
+          identity[suite.split].add(`${key.scenario}#${String(key.scenarioSeed)}`);
+          for (const f of ['traces.jsonl', 'metrics.jsonl', 'logs.jsonl'])
+            seen[suite.split].add(
+              createHash('sha256')
+                .update(await readFile(join(b.dir, f)))
+                .digest('hex'),
+            );
+        }
+      } finally {
+        await built.cleanup();
+      }
+    }
+    expect(identity.development.size).toBeGreaterThan(0);
+    expect(identity['held-out'].size).toBeGreaterThan(0);
+    expect([...identity.development].filter((x) => identity['held-out'].has(x))).toEqual([]);
+    expect([...seen.development].filter((x) => seen['held-out'].has(x))).toEqual([]);
+    // Scenario names, not only seeds, are disjoint.
+    const names = (side: string) =>
+      new Set([...identity[side as 'development']].map((x) => x.split('#')[0]));
+    expect([...names('development')].filter((n) => names('held-out').has(n))).toEqual([]);
   });
 
   it('keeps answer-key values and scenario constants out of the investigator and the pipeline', async () => {

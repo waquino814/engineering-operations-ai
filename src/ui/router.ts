@@ -9,6 +9,8 @@ export type Route =
   | { name: 'investigation'; id: string }
   | { name: 'new' }
   | { name: 'settings' }
+  | { name: 'evaluations' }
+  | { name: 'evaluation'; id: string }
   | { name: 'not_found'; path: string };
 
 export function parseRoute(hash: string): Route {
@@ -16,6 +18,9 @@ export function parseRoute(hash: string): Route {
   if (path === '/' || path === '/investigations') return { name: 'investigations' };
   if (path === '/new') return { name: 'new' };
   if (path === '/settings') return { name: 'settings' };
+  if (path === '/evaluations') return { name: 'evaluations' };
+  const e = /^\/evaluations\/([A-Za-z0-9_-]+)$/.exec(path);
+  if (e?.[1]) return { name: 'evaluation', id: e[1] };
   const m = /^\/investigations\/([A-Za-z0-9_-]+)$/.exec(path);
   if (m?.[1]) return { name: 'investigation', id: m[1] };
   return { name: 'not_found', path };
@@ -31,6 +36,10 @@ export function href(route: Exclude<Route, { name: 'not_found' }>): string {
       return '#/new';
     case 'settings':
       return '#/settings';
+    case 'evaluations':
+      return '#/evaluations';
+    case 'evaluation':
+      return `#/evaluations/${route.id}`;
   }
 }
 

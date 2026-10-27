@@ -16,6 +16,8 @@ export interface AppConfig {
   bundlesDir: string;
   runsDir: string;
   settingsFile: string;
+  /** Where stored evaluation runs live: beside the runs directory. */
+  evaluationsDir: string;
   /** Set by EOAI_MODEL_PROVIDER; the Settings page cannot change it. */
   pinned: ProviderName | null;
   /** A validated loopback endpoint; Ollama is not contacted until a status check or a run. */
@@ -55,5 +57,6 @@ export function loadConfig(env: AppEnv): AppConfig {
     problems.push('EOAI_OLLAMA_URL must be http on a loopback address');
   }
   if (problems.length > 0) throw new AppConfigError(problems);
-  return { bundlesDir, runsDir, settingsFile, pinned, ollamaUrl };
+  const evaluationsDir = runsDir === '' ? '' : join(dirname(runsDir), 'evaluations');
+  return { bundlesDir, runsDir, settingsFile, evaluationsDir, pinned, ollamaUrl };
 }

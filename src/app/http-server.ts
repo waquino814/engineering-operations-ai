@@ -83,6 +83,10 @@ const ERRORS: Record<string, [number, string]> = {
   // The message of a blocked provider is dynamic (it says why); see `fail`'s override.
   provider_blocked: [409, 'the selected provider cannot run. Nothing was run.'],
   provider_pinned: [409, 'the provider is fixed by EOAI_MODEL_PROVIDER and cannot be changed here'],
+  unknown_suite: [400, 'no such evaluation suite'],
+  evaluation_not_found: [404, 'no such evaluation'],
+  evaluation_unreadable: [500, 'the stored evaluation could not be read'],
+  different_suite: [409, 'the two evaluations are of different suites or versions'],
   settings_unreadable: [500, 'the settings file could not be read or is not valid'],
   busy: [429, 'an investigation is already running'],
   run_unreadable: [500, 'the stored run could not be read'],
@@ -201,7 +205,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     ...options.appDeps,
     signal: abort.signal,
   });
-  if (options.ensureDirs) await ensureDataDirs([app.config.bundlesDir, app.config.runsDir]);
+  if (options.ensureDirs)
+    await ensureDataDirs([app.config.bundlesDir, app.config.runsDir, app.config.evaluationsDir]);
   const assets = options.staticDir
     ? await loadStatic(options.staticDir)
     : new Map<string, { body: Buffer; type: string }>();
@@ -265,6 +270,69 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     if (path === '/api/bundles') {
       if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
       return send(res, 200, { bundles: (await app.listBundles()).map((id) => ({ id })) });
+    }
+    if (path === '/api/evaluation-suites') {
+      if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
+      return send(res, 200, { suites: app.listEvaluationSuites() });
+    }
+    if (path === '/api/evaluations') {
+      if (method === 'GET') return send(res, 200, { evaluations: await app.listEvaluations() });
+      if (method !== 'POST') return fail(res, 'method_not_allowed', { allow: 'GET, POST' });
+      const body = await jsonBody(req, res, allowedHosts);
+      if (body === null) return true;
+      const v = body.value;
+      const keys = typeof v === 'object' && v !== null && !Array.isArray(v) ? Object.keys(v) : [];
+      const { suiteId, provider } = (v ?? {}) as Json;
+      if (
+        keys.length !== 2 ||
+        typeof suiteId !== 'string' ||
+        (provider !== 'scripted' && provider !== 'simulated' && provider !== 'ollama')
+      )
+        return fail(res, 'bad_request');
+      if (running) return fail(res, 'busy');
+      running = true;
+      const cancel = new AbortController();
+      res.once('close', () => {
+        if (!res.writableEnded) cancel.abort();
+      });
+      try {
+        const out = await app.startEvaluation({ suiteId, provider }, { signal: cancel.signal });
+        if (out.status === 'refused') return fail(res, out.reason, {}, out.message);
+        if (out.status === 'error') return fail(res, out.reason);
+        return send(res, 201, { id: out.run.id, status: out.run.status });
+      } finally {
+        running = false;
+      }
+    }
+    const compare = /^\/api\/evaluations\/([^/]+)\/compare\/([^/]+)$/.exec(path);
+    if (compare) {
+      if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
+      const out = await app.compareEvaluations(safeDecode(compare[1]), safeDecode(compare[2]));
+      if (out.status === 'ok') return send(res, 200, { ...out.comparison });
+      return fail(
+        res,
+        out.reason === 'invalid_id'
+          ? 'invalid_run_id'
+          : out.reason === 'not_found'
+            ? 'evaluation_not_found'
+            : out.reason === 'unreadable'
+              ? 'evaluation_unreadable'
+              : 'different_suite',
+      );
+    }
+    const evaluation = /^\/api\/evaluations\/([^/]+)$/.exec(path);
+    if (evaluation) {
+      if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
+      const got = await app.getEvaluation(safeDecode(evaluation[1]));
+      if (got.ok) return send(res, 200, { evaluation: got.run });
+      return fail(
+        res,
+        got.reason === 'invalid_id'
+          ? 'invalid_run_id'
+          : got.reason === 'not_found'
+            ? 'evaluation_not_found'
+            : 'evaluation_unreadable',
+      );
     }
     const evidence = /^\/api\/runs\/([^/]+)\/evidence$/.exec(path);
     if (evidence) {

@@ -228,6 +228,8 @@ let readyMark = 0;
 let fakeRunId = '';
 let ollamaRunId = '';
 let ollamaText = '';
+let realEvaluationId = '';
+let scriptedEvaluationId = '';
 
 /** The application re-reads the cited records from the bundle: every citation verifies, no model runs. */
 async function citationsRecheck(runId: string) {
@@ -363,6 +365,36 @@ describe('local workflow, as real processes', { timeout: 120_000 }, () => {
     await citationsRecheck(fakeRunId);
   });
 
+  it('runs a scripted evaluation through the proxy, stores it, and labels it as a test double', async () => {
+    const suites = (await http(uiPort, 'GET', '/api/evaluation-suites')).json()['suites'] as {
+      id: string;
+    }[];
+    expect(suites.map((x) => x.id)).toEqual(['development', 'held-out']);
+    const r = await http(uiPort, 'POST', '/api/evaluations', {
+      body: JSON.stringify({ suiteId: 'development', provider: 'scripted' }),
+      headers: { 'content-type': 'application/json', origin: `http://localhost:${String(uiPort)}` },
+    });
+    expect(r.status).toBe(201);
+    scriptedEvaluationId = String(r.json()['id']);
+    const doc = (await http(uiPort, 'GET', `/api/evaluations/${scriptedEvaluationId}`)).json()[
+      'evaluation'
+    ] as {
+      provider: { kind: string; simulated: boolean };
+      measuresModelQuality: boolean;
+      suite: { split: string };
+      metrics: { id: string; numerator: number | null; denominator: number }[];
+    };
+    expect(doc).toMatchObject({
+      provider: { kind: 'scripted', simulated: true },
+      measuresModelQuality: false,
+      suite: { split: 'development' },
+    });
+    expect(doc.metrics.find((m) => m.id === 'root_cause_correct')).toMatchObject({
+      numerator: 3,
+      denominator: 7,
+    });
+  });
+
   it('rejects malformed requests, bad ids and missing things with structured errors', async () => {
     const cases: [Promise<Reply>, number, string][] = [
       [post(uiPort, '{oops'), 400, 'bad_request'],
@@ -474,6 +506,30 @@ describe('local workflow, as real processes', { timeout: 120_000 }, () => {
       );
       expect(badRun.ok && badRun.result.outcome).toBe('failed');
       expect(badRun.ok && badRun.result.findings).toEqual([]);
+
+      // An evaluation of the held-out suite through the same verified runtime is recorded as a
+      // real model's, and a reply that cites nothing real is a miss, not a success.
+      const evaluated = await http(uiPort, 'POST', '/api/evaluations', {
+        body: JSON.stringify({ suiteId: 'held-out', provider: 'ollama' }),
+        headers: { 'content-type': 'application/json' },
+      });
+      expect(evaluated.status).toBe(201);
+      realEvaluationId = String(evaluated.json()['id']);
+      const doc = (await http(uiPort, 'GET', `/api/evaluations/${realEvaluationId}`)).json()[
+        'evaluation'
+      ] as {
+        provider: { kind: string; model: string; simulated: boolean };
+        measuresModelQuality: boolean;
+        report: { cases: { summary: { outcome: string }; failure: { class: string } | null }[] };
+      };
+      expect(doc.provider).toEqual({
+        kind: 'real_model',
+        provider: 'ollama',
+        model: 'tiny:1b',
+        simulated: false,
+      });
+      expect(doc.measuresModelQuality).toBe(true);
+      expect(doc.report.cases[0]?.summary.outcome).toBe('failed');
     } finally {
       await stub.close();
     }
@@ -484,6 +540,11 @@ describe('local workflow, as real processes', { timeout: 120_000 }, () => {
     expect(status).toMatchObject({ selected: 'ollama', runnable: false });
     const refused = await post(uiPort, JSON.stringify({ bundleId: EXCERPT }));
     expect([refused.status, refused.json().error.code]).toEqual([409, 'provider_blocked']);
+    const evalRefused = await http(uiPort, 'POST', '/api/evaluations', {
+      body: JSON.stringify({ suiteId: 'development', provider: 'ollama' }),
+      headers: { 'content-type': 'application/json' },
+    });
+    expect([evalRefused.status, evalRefused.json().error.code]).toEqual([409, 'provider_blocked']);
     expect((await http(uiPort, 'GET', '/api/runs')).json().runs.length).toBe(before);
   });
 
@@ -509,6 +570,29 @@ describe('local workflow, as real processes', { timeout: 120_000 }, () => {
       }),
     );
     expect(providers).toEqual(['fake', 'ollama']);
+    // Stored evaluations survive the restart too, and reopening one runs nothing.
+    const evaluations = (await http(uiPort, 'GET', '/api/evaluations')).json()['evaluations'] as {
+      id: string;
+      ok: boolean;
+      provider: { kind: string };
+    }[];
+    expect(
+      evaluations
+        .filter((e) => e.ok)
+        .map((e) => [e.id, e.provider.kind])
+        .sort(),
+    ).toEqual(
+      [
+        [scriptedEvaluationId, 'scripted'],
+        [realEvaluationId, 'real_model'],
+      ].sort(),
+    );
+    const compare = await http(
+      uiPort,
+      'GET',
+      `/api/evaluations/${scriptedEvaluationId}/compare/${scriptedEvaluationId}`,
+    );
+    expect(compare.status).toBe(200);
   });
 
   it('shuts down cleanly and leaves no listener behind', async () => {

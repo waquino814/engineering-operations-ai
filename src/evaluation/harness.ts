@@ -5,9 +5,10 @@ import { MODEL_OUTPUT_SCHEMA } from '../investigation/schemas.ts';
 import { readInvestigationResult, type InvestigationResult } from '../investigation/result.ts';
 import { summarize, type InvestigationSummary } from '../investigation/summary.ts';
 import { runInvestigation } from '../pipeline/run-investigation.ts';
+import { checkCitations } from '../app/evidence.ts';
 import { readAnswerKey } from './ground-truth.ts';
 import { findLeaks, legitimateText, protectedValues, type LeakFinding } from './leakage.ts';
-import { scoreResult, type Score } from './score.ts';
+import { explainScore, scoreResult, type Score } from './score.ts';
 
 /**
  * The evaluation harness (ADR 0009). For each case it runs the normal pipeline, then, separately,
@@ -24,13 +25,28 @@ export interface EvaluationCase {
   bundleDir: string;
   provider: ModelProvider;
   limits?: Partial<Record<string, unknown>>;
+  /** Cancels the investigation (a client that went away, a deadline). */
+  signal?: AbortSignal;
 }
 
 export interface CaseReport {
   id: string;
   kind: EvaluationCase['kind'];
   summary: Omit<InvestigationSummary, 'durationMs'>;
+  /** The failure the pipeline recorded (sanitised), when the case did not complete. */
+  failure: { class: string; message: string } | null;
+  /** The scenario of the answer key, when the bundle was admitted. */
+  scenario: { name: string; seed: number } | null;
   score: Score | null;
+  /** Why it scored as it did, in plain sentences; empty when not admitted. */
+  rationale: string[];
+  /**
+   * The result's citations re-read from the bundle by a second, independent check (not the
+   * pipeline's own): `verified` of `citations`. Null when the bundle was not admitted.
+   */
+  grounding: { citations: number; verified: number } | null;
+  /** Wall-clock milliseconds, present only when the caller supplied a clock. */
+  durationMs?: number;
   /** Whether the result passed `readInvestigationResult`. */
   resultValid: boolean;
   answerLeak: {
@@ -103,47 +119,75 @@ const resultMetadata = (r: InvestigationResult) =>
     run: r.run,
   });
 
-export async function runEvaluation(cases: EvaluationCase[]): Promise<EvaluationReport> {
-  const reports: CaseReport[] = [];
-  for (const c of cases) {
-    const provider = new Recording(c.provider);
-    // A fixed clock: timing is not part of the report.
-    const { result } = await runInvestigation(c.bundleDir, {
-      provider,
-      now: () => 0,
-      sleep: () => Promise.resolve(),
-      ...(c.limits ? { limits: c.limits } : {}),
-    });
-    // Scoring starts only after the investigation has finished.
-    const key = await readAnswerKey(c.bundleDir);
-    const view = await openEvidence(c.bundleDir).catch(() => null);
-    const leaks = findLeaks(
-      [
-        ...provider.requests.map((r) => ({ channel: 'request', text: requestText(r) })),
-        { channel: 'result_metadata', text: resultMetadata(result) },
-      ],
-      await protectedValues(c.bundleDir),
-      legitimateText(view, [INSTRUCTIONS, JSON.stringify(MODEL_OUTPUT_SCHEMA)]),
-    );
-    const summary: Omit<InvestigationSummary, 'durationMs'> & { durationMs?: number } =
-      summarize(result);
-    delete summary.durationMs;
-    reports.push({
-      id: c.id,
-      kind: c.kind,
-      summary,
-      score: result.caseId === null ? null : scoreResult(result, key),
-      resultValid: readInvestigationResult(result).ok,
-      answerLeak: {
-        checkedRequests: provider.requests.length,
-        checkedValues: leaks.checkedValues,
-        legitimatelyPresent: leaks.legitimatelyPresent,
-        leaked: leaks.findings.length > 0,
-        // One entry per channel and source, in a stable order.
-        findings: [...new Map(leaks.findings.map((f) => [`${f.channel}|${f.source}`, f])).values()],
-      },
-    });
-  }
+export interface EvaluationOptions {
+  /** Milliseconds since some origin; when given, each case reports its `durationMs`. */
+  clock?: () => number;
+}
+
+/** One case through the pipeline, then, separately, the answer key. */
+export async function evaluateCase(
+  c: EvaluationCase,
+  options: EvaluationOptions = {},
+): Promise<CaseReport> {
+  const started = options.clock?.();
+  const provider = new Recording(c.provider);
+  // A fixed clock inside the pipeline: timing is not part of the deterministic report.
+  const { result } = await runInvestigation(c.bundleDir, {
+    provider,
+    now: () => 0,
+    sleep: () => Promise.resolve(),
+    ...(c.limits ? { limits: c.limits } : {}),
+    ...(c.signal ? { signal: c.signal } : {}),
+  });
+  const elapsed = started === undefined || !options.clock ? undefined : options.clock() - started;
+  // Scoring starts only after the investigation has finished.
+  const key = await readAnswerKey(c.bundleDir);
+  const view = await openEvidence(c.bundleDir).catch(() => null);
+  const leaks = findLeaks(
+    [
+      ...provider.requests.map((r) => ({ channel: 'request', text: requestText(r) })),
+      { channel: 'result_metadata', text: resultMetadata(result) },
+    ],
+    await protectedValues(c.bundleDir),
+    legitimateText(view, [INSTRUCTIONS, JSON.stringify(MODEL_OUTPUT_SCHEMA)]),
+  );
+  const summary: Omit<InvestigationSummary, 'durationMs'> & { durationMs?: number } =
+    summarize(result);
+  delete summary.durationMs;
+  const admitted = result.caseId !== null;
+  const score = admitted ? scoreResult(result, key) : null;
+  const rechecked = admitted ? await checkCitations(c.bundleDir, result) : null;
+  return {
+    id: c.id,
+    kind: c.kind,
+    summary,
+    failure: result.failure
+      ? { class: result.failure.class, message: result.failure.message }
+      : null,
+    scenario: admitted ? { name: key.scenario, seed: key.scenarioSeed } : null,
+    score,
+    rationale: score ? explainScore(result, score, key) : [],
+    grounding:
+      rechecked?.status === 'checked'
+        ? {
+            citations: rechecked.citations.length,
+            verified: rechecked.citations.filter((x) => x.status === 'verified').length,
+          }
+        : null,
+    resultValid: readInvestigationResult(result).ok,
+    answerLeak: {
+      checkedRequests: provider.requests.length,
+      checkedValues: leaks.checkedValues,
+      legitimatelyPresent: leaks.legitimatelyPresent,
+      leaked: leaks.findings.length > 0,
+      // One entry per channel and source, in a stable order.
+      findings: [...new Map(leaks.findings.map((f) => [`${f.channel}|${f.source}`, f])).values()],
+    },
+    ...(elapsed === undefined ? {} : { durationMs: elapsed }),
+  };
+}
+
+export function buildReport(reports: CaseReport[]): EvaluationReport {
   const byOutcome: Record<string, number> = {};
   for (const r of reports) byOutcome[r.summary.outcome] = (byOutcome[r.summary.outcome] ?? 0) + 1;
   return {
@@ -161,4 +205,13 @@ export async function runEvaluation(cases: EvaluationCase[]): Promise<Evaluation
       answerLeaks: reports.filter((r) => r.answerLeak.leaked).length,
     },
   };
+}
+
+export async function runEvaluation(
+  cases: EvaluationCase[],
+  options: EvaluationOptions = {},
+): Promise<EvaluationReport> {
+  const reports: CaseReport[] = [];
+  for (const c of cases) reports.push(await evaluateCase(c, options));
+  return buildReport(reports);
 }

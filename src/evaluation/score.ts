@@ -62,3 +62,33 @@ export function scoreResult(result: InvestigationResult, key: AnswerKey): Score 
     },
   };
 }
+
+/**
+ * Plain sentences saying why a result scored as it did, for the operator. They restate the score
+ * and the answer key's expected values; they add no judgement of their own.
+ */
+export function explainScore(result: InvestigationResult, score: Score, key: AnswerKey): string[] {
+  const named = [
+    ...new Set(result.findings.filter((f) => f.kind === 'root_cause').flatMap((f) => f.components)),
+  ].sort();
+  const lines: string[] = [];
+  if (result.outcome !== 'completed')
+    lines.push(`The investigation ended ${result.outcome}, so no diagnosis was scored as correct.`);
+  const root = {
+    correct: `Root cause correct: the finding names ${key.rootCauseComponent}.`,
+    incorrect: `Root cause incorrect: named ${named.join(', ')}; expected ${key.rootCauseComponent}.`,
+    ambiguous: `Root cause ambiguous: ${String(named.length)} components named as the root cause (${named.join(', ')}); expected ${key.rootCauseComponent}.`,
+    missing: `No root-cause finding; expected ${key.rootCauseComponent}.`,
+  } as const;
+  lines.push(root[score.rootCause]);
+  lines.push(
+    score.symptomEvidence === 'covered'
+      ? `A finding cites the primary symptom's series (${key.primarySymptom.metric}).`
+      : `No finding cites the primary symptom's series (${key.primarySymptom.metric}) with its labels.`,
+  );
+  const missed = score.affected.expected.filter((c) => !score.affected.predicted.includes(c));
+  const extra = score.affected.predicted.filter((c) => !score.affected.expected.includes(c));
+  if (missed.length > 0) lines.push(`Affected components not named: ${missed.join(', ')}.`);
+  if (extra.length > 0) lines.push(`Components named that are not affected: ${extra.join(', ')}.`);
+  return lines;
+}

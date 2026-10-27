@@ -22,6 +22,12 @@ describe('routes', () => {
     expect(parseRoute('#/investigations/fx-001')).toEqual({ name: 'investigation', id: 'fx-001' });
     expect(parseRoute('#/new')).toEqual({ name: 'new' });
     expect(parseRoute('#/settings')).toEqual({ name: 'settings' });
+    expect(parseRoute('#/evaluations')).toEqual({ name: 'evaluations' });
+    expect(parseRoute('#/evaluations/20261027T120000Z-held-out-scripted')).toEqual({
+      name: 'evaluation',
+      id: '20261027T120000Z-held-out-scripted',
+    });
+    expect(parseRoute('#/evaluations/../x')).toMatchObject({ name: 'not_found' });
     expect(parseRoute('#/investigations/../x')).toEqual({
       name: 'not_found',
       path: '/investigations/../x',
@@ -34,6 +40,8 @@ describe('routes', () => {
       { name: 'investigation', id: 'fx-002' },
       { name: 'new' },
       { name: 'settings' },
+      { name: 'evaluations' },
+      { name: 'evaluation', id: '20261027T120000Z-development-scripted' },
     ] as const)
       expect(parseRoute(href(route))).toEqual(route);
   });
@@ -49,13 +57,14 @@ describe('routes', () => {
 });
 
 describe('the shell', () => {
-  it('has the three sections in a labelled navigation, marking the current one', async () => {
+  it('has the four sections in a labelled navigation, marking the current one', async () => {
     renderAt('#/investigations');
     const nav = screen.getByRole('navigation', { name: 'Main' });
     const links = within(nav).getAllByRole('link');
     expect(links.map((l) => l.textContent)).toEqual([
       '≡Investigations',
       '+New Investigation',
+      '✓Evaluations',
       '⚙Settings',
     ]);
     expect(within(nav).getByRole('link', { name: 'Investigations' })).toHaveProperty(

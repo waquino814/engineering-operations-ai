@@ -47,6 +47,16 @@ export function createFixtureSource(fixtures: UiFixtures): InvestigationDataSour
         models: [],
         reason: null,
       }),
+    // Evaluations are run and stored by the application; fixtures have none.
+    listEvaluationSuites: () => Promise.resolve([]),
+    listEvaluations: () => Promise.resolve([]),
+    getEvaluation: () => Promise.resolve(null),
+    startEvaluation: () =>
+      Promise.resolve({
+        status: 'refused',
+        message: 'The console is showing fixtures; evaluations need the application.',
+      }),
+    compareEvaluations: () => Promise.reject(new Error('Fixtures have no evaluations to compare.')),
     getEvidence: () => Promise.resolve({ status: 'unavailable', reason: 'fixture' }),
     getSettings: () => Promise.resolve({ provider: 'fake', ollamaModel: null, pinned: true }),
     saveSettings: () =>

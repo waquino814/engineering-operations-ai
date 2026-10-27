@@ -21,6 +21,19 @@ import {
 } from './settings.ts';
 import { checkCitations, type EvidenceReport } from './evidence.ts';
 import {
+  compareStored,
+  getEvaluation,
+  listEvaluations,
+  listEvaluationSuites,
+  runAndStoreEvaluation,
+  type Comparison,
+  type EvaluationEntry,
+  type EvaluationLookup,
+  type EvaluationRun,
+  type ProviderChoice,
+  type SuiteDefinition,
+} from './evaluation-service.ts';
+import {
   getRun,
   listRuns,
   readRunMeta,
@@ -87,6 +100,13 @@ export interface ProviderStatus {
   reason: string | null;
 }
 
+export type EvaluationProvider = 'scripted' | 'simulated' | 'ollama';
+
+export type EvaluationStart =
+  | { status: 'done'; run: EvaluationRun }
+  | { status: 'error'; reason: 'unknown_suite' }
+  | { status: 'refused'; reason: 'provider_blocked'; message: string };
+
 export type SettingsUpdate =
   { status: 'saved'; settings: Settings } | { status: 'invalid' } | { status: 'pinned' };
 
@@ -135,6 +155,26 @@ export interface Application {
   getProviderStatus(): Promise<ProviderStatus>;
   startInvestigation(bundleId: string, options?: { signal?: AbortSignal }): Promise<StartOutcome>;
   listRuns(): Promise<RunEntry[]>;
+  /** The versioned evaluation suites that can be run (E7). */
+  listEvaluationSuites(): SuiteDefinition[];
+  /**
+   * Runs a suite through the real pipeline and stores the result. `scripted` and `simulated`
+   * are test doubles and are labelled so; `ollama` goes through the same local-only check as an
+   * investigation and is refused, with the reason, when it does not pass. Nothing falls back.
+   */
+  startEvaluation(
+    input: { suiteId: string; provider: EvaluationProvider },
+    options?: { signal?: AbortSignal },
+  ): Promise<EvaluationStart>;
+  listEvaluations(): Promise<EvaluationEntry[]>;
+  getEvaluation(id: string): Promise<EvaluationLookup>;
+  compareEvaluations(
+    a: string,
+    b: string,
+  ): Promise<
+    | { status: 'ok'; comparison: Comparison }
+    | { status: 'error'; reason: 'invalid_id' | 'not_found' | 'unreadable' | 'different_suite' }
+  >;
   /** Re-checks a saved run's citations against the original bundle and returns the cited text. */
   getEvidence(
     runId: string,
@@ -166,8 +206,10 @@ export function createApplication(env: AppEnv, deps: AppDeps = {}): Application 
   };
   const status = async (
     signal?: AbortSignal,
+    override?: ProviderName,
   ): Promise<{ status: ProviderStatus; build: (() => ModelProvider) | null }> => {
     const chosen = await selection();
+    if (override !== undefined) chosen.provider = override;
     const base = { selected: chosen.provider, pinned: chosen.pinned, models: [] as string[] };
     if (chosen.provider === 'fake') {
       const provider: ModelProvider = scripted ?? new SimulatedProvider();
@@ -213,6 +255,54 @@ export function createApplication(env: AppEnv, deps: AppDeps = {}): Application 
       return { status: 'saved', settings: parsed };
     },
     getProviderStatus: async () => (await status()).status,
+    listEvaluationSuites,
+    async startEvaluation(input, options = {}) {
+      if (!listEvaluationSuites().some((s) => s.id === input.suiteId))
+        return { status: 'error', reason: 'unknown_suite' };
+      let choice: ProviderChoice;
+      if (input.provider === 'ollama') {
+        // The same local-only check as an investigation, before anything is built or run.
+        let ready;
+        try {
+          ready = await status(options.signal, 'ollama');
+        } catch (e) {
+          if (!(e instanceof SettingsError)) throw e;
+          return {
+            status: 'refused',
+            reason: 'provider_blocked',
+            message: `${e.message}. Nothing was run.`,
+          };
+        }
+        if (config.pinned !== null && config.pinned !== 'ollama')
+          return {
+            status: 'refused',
+            reason: 'provider_blocked',
+            message: `The provider is fixed to ${config.pinned} outside the console, so an Ollama evaluation cannot be started. Nothing was run.`,
+          };
+        if (ready.build === null)
+          return {
+            status: 'refused',
+            reason: 'provider_blocked',
+            message: ready.status.reason ?? 'Ollama cannot run. Nothing was run.',
+          };
+        choice = { kind: 'real_model', provider: ready.build(), limits: LOCAL_LIMITS };
+      } else if (input.provider === 'simulated') {
+        choice = { kind: 'simulated', provider: new SimulatedProvider() };
+      } else {
+        choice = { kind: 'scripted' };
+      }
+      const signals = [deps.signal, options.signal].flatMap((x) => (x ? [x] : []));
+      const signal = signals.length > 0 ? AbortSignal.any(signals) : undefined;
+      const run = await runAndStoreEvaluation(config.evaluationsDir, input.suiteId, choice, {
+        nowMs: now(),
+        clock: () => Date.now(),
+        ...(signal ? { signal } : {}),
+      });
+      return run === null ? { status: 'error', reason: 'unknown_suite' } : { status: 'done', run };
+    },
+    listEvaluations: () => listEvaluations(config.evaluationsDir),
+    getEvaluation: (id) => getEvaluation(config.evaluationsDir, id),
+    compareEvaluations: (a, b) => compareStored(config.evaluationsDir, a, b),
     listBundles: () => listBundleIds(config.bundlesDir),
     async validateBundle(bundleId) {
       const found = await resolveBundle(config.bundlesDir, bundleId);

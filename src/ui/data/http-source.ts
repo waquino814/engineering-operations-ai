@@ -1,6 +1,11 @@
 import { readInvestigationResult } from '../../investigation/result.ts';
 import type {
   BundleIssue,
+  EvaluationComparisonView,
+  EvaluationDetailView,
+  EvaluationEntryView,
+  EvaluationStartOutcome,
+  EvaluationSuite,
   CitationCheck,
   BundleOption,
   BundleValidation,
@@ -34,6 +39,95 @@ function parseSettings(b: Json): ProviderSettings {
   )
     throw new ApiError('The settings response is malformed.');
   return { provider: b['provider'], ollamaModel: b['ollamaModel'], pinned: b['pinned'] };
+}
+
+const bad = (what: string) => new ApiError(`The ${what} response is malformed.`);
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const isNum = (v: unknown): v is number => typeof v === 'number';
+const PROVIDER_KINDS = ['scripted', 'simulated', 'real_model'];
+
+function parseProvider(v: unknown): EvaluationDetailView['provider'] {
+  if (
+    !isObject(v) ||
+    !PROVIDER_KINDS.includes(String(v['kind'])) ||
+    !isStr(v['provider']) ||
+    !isStr(v['model']) ||
+    typeof v['simulated'] !== 'boolean'
+  )
+    throw bad('evaluation');
+  return v as EvaluationDetailView['provider'];
+}
+
+function parseSuite(v: unknown): EvaluationDetailView['suite'] {
+  if (
+    !isObject(v) ||
+    !isStr(v['id']) ||
+    !isStr(v['version']) ||
+    (v['split'] !== 'development' && v['split'] !== 'held-out') ||
+    typeof v['synthetic'] !== 'boolean' ||
+    !isStr(v['description'])
+  )
+    throw bad('evaluation');
+  return v as EvaluationDetailView['suite'];
+}
+
+function parseMetrics(v: unknown): EvaluationDetailView['metrics'] {
+  if (!Array.isArray(v)) throw bad('evaluation');
+  return v.map((m: unknown) => {
+    if (
+      !isObject(m) ||
+      !isStr(m['id']) ||
+      !isStr(m['label']) ||
+      !isStr(m['definition']) ||
+      !(m['numerator'] === null || isNum(m['numerator'])) ||
+      !isNum(m['denominator']) ||
+      !(m['value'] === null || isNum(m['value'])) ||
+      !['scored', 'not_applicable', 'not_scored'].includes(String(m['status']))
+    )
+      throw bad('evaluation');
+    return m as unknown as EvaluationDetailView['metrics'][number];
+  });
+}
+
+function parseCases(v: unknown): EvaluationDetailView['report']['cases'] {
+  if (!Array.isArray(v)) throw bad('evaluation');
+  return v.map((c: unknown) => {
+    if (
+      !isObject(c) ||
+      !isStr(c['id']) ||
+      !isObject(c['summary']) ||
+      !isStr(c['summary']['outcome']) ||
+      !Array.isArray(c['rationale']) ||
+      !isObject(c['answerLeak']) ||
+      typeof c['resultValid'] !== 'boolean'
+    )
+      throw bad('evaluation');
+    return c as unknown as EvaluationDetailView['report']['cases'][number];
+  });
+}
+
+function parseEvaluation(v: unknown): EvaluationDetailView {
+  if (
+    !isObject(v) ||
+    !isStr(v['id']) ||
+    !isStr(v['startedAt']) ||
+    !isNum(v['durationMs']) ||
+    typeof v['measuresModelQuality'] !== 'boolean' ||
+    (v['status'] !== 'complete' && v['status'] !== 'incomplete') ||
+    !isObject(v['report']) ||
+    !isObject(v['reliability']) ||
+    !Array.isArray(v['scenarios']) ||
+    !Array.isArray(v['harnessErrors']) ||
+    !Array.isArray(v['limitations'])
+  )
+    throw bad('evaluation');
+  return {
+    ...(v as unknown as EvaluationDetailView),
+    suite: parseSuite(v['suite']),
+    provider: parseProvider(v['provider']),
+    metrics: parseMetrics(v['metrics']),
+    report: { cases: parseCases(v['report']['cases']) },
+  };
 }
 
 const GATEWAY_STATUSES = new Set([502, 503, 504]);
@@ -132,6 +226,95 @@ export function createHttpSource(
         models: b['models'],
         reason: b['reason'],
       };
+    },
+    async listEvaluationSuites() {
+      const b = await ok('/api/evaluation-suites');
+      if (!Array.isArray(b['suites'])) throw bad('suite list');
+      return b['suites'].map((x: unknown) => {
+        if (
+          !isObject(x) ||
+          !isStr(x['id']) ||
+          !isStr(x['version']) ||
+          (x['split'] !== 'development' && x['split'] !== 'held-out') ||
+          !isStr(x['description']) ||
+          !Array.isArray(x['cases'])
+        )
+          throw bad('suite list');
+        return x as unknown as EvaluationSuite;
+      });
+    },
+    async listEvaluations() {
+      const b = await ok('/api/evaluations');
+      if (!Array.isArray(b['evaluations'])) throw bad('evaluation list');
+      return b['evaluations'].map((e: unknown): EvaluationEntryView => {
+        if (!isObject(e) || !isStr(e['id'])) throw bad('evaluation list');
+        if (e['ok'] === false)
+          return {
+            id: e['id'],
+            ok: false,
+            problems: Array.isArray(e['problems']) ? e['problems'].filter(isStr) : [],
+          };
+        if (
+          e['ok'] !== true ||
+          !isStr(e['startedAt']) ||
+          typeof e['measuresModelQuality'] !== 'boolean' ||
+          (e['status'] !== 'complete' && e['status'] !== 'incomplete') ||
+          !isObject(e['headline']) ||
+          !isNum(e['headline']['cases']) ||
+          !isStr(e['headline']['rootCauseCorrect']) ||
+          !isStr(e['headline']['completion'])
+        )
+          throw bad('evaluation list');
+        return {
+          ...(e as unknown as Extract<EvaluationEntryView, { ok: true }>),
+          suite: parseSuite(e['suite']),
+          provider: parseProvider(e['provider']),
+        };
+      });
+    },
+    async getEvaluation(id) {
+      const { status, body } = await call(`/api/evaluations/${encodeURIComponent(id)}`);
+      if (status === 404) return null;
+      if (status !== 200) {
+        const e = errorOf(body);
+        throw new ApiError(e.message, e.code);
+      }
+      return parseEvaluation(body['evaluation']);
+    },
+    async startEvaluation(input): Promise<EvaluationStartOutcome> {
+      let result: { status: number; body: Json };
+      try {
+        result = await call('/api/evaluations', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(input),
+        });
+      } catch (e) {
+        return { status: 'error', message: e instanceof Error ? e.message : 'The request failed.' };
+      }
+      if (result.status === 201 && isStr(result.body['id']))
+        return { status: 'started', id: result.body['id'] };
+      const e = errorOf(result.body);
+      return e.code === 'provider_blocked'
+        ? { status: 'refused', message: e.message }
+        : { status: 'error', message: e.message };
+    },
+    async compareEvaluations(a, b) {
+      const body = await ok(
+        `/api/evaluations/${encodeURIComponent(a)}/compare/${encodeURIComponent(b)}`,
+      );
+      if (
+        !isObject(body['suite']) ||
+        !isObject(body['a']) ||
+        !isObject(body['b']) ||
+        typeof body['sameProvider'] !== 'boolean' ||
+        !Array.isArray(body['metrics']) ||
+        !Array.isArray(body['cases']) ||
+        !isNum(body['regressions']) ||
+        !isNum(body['improvements'])
+      )
+        throw bad('comparison');
+      return body as unknown as EvaluationComparisonView;
     },
     async getEvidence(id) {
       const b = await ok(`/api/runs/${encodeURIComponent(id)}/evidence`);

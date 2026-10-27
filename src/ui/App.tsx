@@ -2,6 +2,8 @@ import type { InvestigationDataSource } from './data/types.ts';
 import { href, useRoute, type Route } from './router.ts';
 import { InvestigationDetail } from './views/InvestigationDetail.tsx';
 import { NewInvestigation } from './views/NewInvestigation.tsx';
+import { EvaluationDetail } from './views/EvaluationDetail.tsx';
+import { Evaluations } from './views/Evaluations.tsx';
 import { Overview } from './views/Overview.tsx';
 import { Settings } from './views/Settings.tsx';
 import { EmptyState, OriginTag } from './components.tsx';
@@ -10,10 +12,16 @@ import { EmptyState, OriginTag } from './components.tsx';
 const NAV = [
   { label: 'Investigations', route: { name: 'investigations' }, icon: '≡' },
   { label: 'New Investigation', route: { name: 'new' }, icon: '+' },
+  { label: 'Evaluations', route: { name: 'evaluations' }, icon: '✓' },
   { label: 'Settings', route: { name: 'settings' }, icon: '⚙' },
 ] as const;
 
-const section = (route: Route) => (route.name === 'investigation' ? 'investigations' : route.name);
+const section = (route: Route) =>
+  route.name === 'investigation'
+    ? 'investigations'
+    : route.name === 'evaluation'
+      ? 'evaluations'
+      : route.name;
 
 export function App({ source }: { source: InvestigationDataSource }) {
   const route = useRoute();
@@ -71,6 +79,10 @@ function View({ route, source }: { route: Route; source: InvestigationDataSource
       return <InvestigationDetail source={source} id={route.id} />;
     case 'new':
       return <NewInvestigation source={source} />;
+    case 'evaluations':
+      return <Evaluations source={source} />;
+    case 'evaluation':
+      return <EvaluationDetail source={source} id={route.id} />;
     case 'settings':
       return <Settings source={source} />;
     case 'not_found':

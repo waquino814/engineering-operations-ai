@@ -73,3 +73,7 @@ Symptom, timeline and remediation scoring are not in v0 (ADR 0004 leaves this op
 - **Positive:** the answer key is read in one audited place, after the fact, and every request and result is checked for leaks with stated limits.
 - **Negative:** synthetic cases measure plumbing, not diagnosis quality. No claim about model accuracy can be made until real bundles are scored.
 - **Revisit if:** real-model results exist, or symptom and remediation scoring is decided.
+
+## Implementation record (2026-10-27)
+
+ADR 0009 stays **Proposed**; this records what E7 built on it, not an acceptance. Scoring v0.1 adds `ambiguous` root causes and primary-symptom series coverage, independent citation re-verification, per-case rationales and aggregate metrics with explicit numerators and denominators. The holdout strategy above is implemented as a scenario-level split registry with run-time and test-time enforcement; the held-out scenario is synthetic, so the "new seeds and at least one unseen **real** scenario" part is not met. Remediation scoring is not implemented because the ground truth gives no rubric. See [docs/evaluation.md](../evaluation.md).

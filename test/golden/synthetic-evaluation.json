@@ -29,6 +29,11 @@
         },
         "selectedRecords": 8
       },
+      "failure": null,
+      "scenario": {
+        "name": "provider-outage",
+        "seed": 42
+      },
       "score": {
         "outcome": "completed",
         "rootCause": "correct",
@@ -45,6 +50,14 @@
           "precision": 1,
           "recall": 1
         }
+      },
+      "rationale": [
+        "Root cause correct: the finding names payment-provider.",
+        "A finding cites the primary symptom's series (commerce_payment_calls_total)."
+      ],
+      "grounding": {
+        "citations": 3,
+        "verified": 3
       },
       "resultValid": true,
       "answerLeak": {
@@ -82,6 +95,11 @@
         },
         "selectedRecords": 8
       },
+      "failure": null,
+      "scenario": {
+        "name": "provider-outage",
+        "seed": 42
+      },
       "score": {
         "outcome": "completed",
         "rootCause": "incorrect",
@@ -97,6 +115,16 @@
           "precision": 0,
           "recall": 0
         }
+      },
+      "rationale": [
+        "Root cause incorrect: named orders-api; expected payment-provider.",
+        "No finding cites the primary symptom's series (commerce_payment_calls_total) with its labels.",
+        "Affected components not named: payment-provider, worker.",
+        "Components named that are not affected: orders-api."
+      ],
+      "grounding": {
+        "citations": 1,
+        "verified": 1
       },
       "resultValid": true,
       "answerLeak": {
@@ -134,6 +162,11 @@
         },
         "selectedRecords": 8
       },
+      "failure": null,
+      "scenario": {
+        "name": "provider-outage",
+        "seed": 42
+      },
       "score": {
         "outcome": "completed",
         "rootCause": "ambiguous",
@@ -150,6 +183,16 @@
           "precision": 0.5,
           "recall": 0.5
         }
+      },
+      "rationale": [
+        "Root cause ambiguous: 2 components named as the root cause (orders-api, payment-provider); expected payment-provider.",
+        "A finding cites the primary symptom's series (commerce_payment_calls_total).",
+        "Affected components not named: worker.",
+        "Components named that are not affected: orders-api."
+      ],
+      "grounding": {
+        "citations": 3,
+        "verified": 3
       },
       "resultValid": true,
       "answerLeak": {
@@ -187,6 +230,11 @@
         },
         "selectedRecords": 8
       },
+      "failure": null,
+      "scenario": {
+        "name": "provider-outage",
+        "seed": 42
+      },
       "score": {
         "outcome": "completed",
         "rootCause": "correct",
@@ -202,6 +250,15 @@
           "precision": 1,
           "recall": 0.5
         }
+      },
+      "rationale": [
+        "Root cause correct: the finding names payment-provider.",
+        "No finding cites the primary symptom's series (commerce_payment_calls_total) with its labels.",
+        "Affected components not named: worker."
+      ],
+      "grounding": {
+        "citations": 1,
+        "verified": 1
       },
       "resultValid": true,
       "answerLeak": {
@@ -240,6 +297,11 @@
         },
         "selectedRecords": 8
       },
+      "failure": null,
+      "scenario": {
+        "name": "provider-outage",
+        "seed": 42
+      },
       "score": {
         "outcome": "completed",
         "rootCause": "correct",
@@ -256,6 +318,14 @@
           "precision": 1,
           "recall": 1
         }
+      },
+      "rationale": [
+        "Root cause correct: the finding names payment-provider.",
+        "A finding cites the primary symptom's series (commerce_payment_calls_total)."
+      ],
+      "grounding": {
+        "citations": 3,
+        "verified": 3
       },
       "resultValid": true,
       "answerLeak": {
@@ -291,6 +361,14 @@
         },
         "selectedRecords": 8
       },
+      "failure": {
+        "class": "evidence_verification_failed",
+        "message": "1 problem(s): line_out_of_range"
+      },
+      "scenario": {
+        "name": "provider-outage",
+        "seed": 42
+      },
       "score": {
         "outcome": "failed",
         "rootCause": "missing",
@@ -304,6 +382,16 @@
           "precision": null,
           "recall": 0
         }
+      },
+      "rationale": [
+        "The investigation ended failed, so no diagnosis was scored as correct.",
+        "No root-cause finding; expected payment-provider.",
+        "No finding cites the primary symptom's series (commerce_payment_calls_total) with its labels.",
+        "Affected components not named: payment-provider, worker."
+      ],
+      "grounding": {
+        "citations": 0,
+        "verified": 0
       },
       "resultValid": true,
       "answerLeak": {
@@ -339,6 +427,11 @@
         },
         "selectedRecords": 8
       },
+      "failure": null,
+      "scenario": {
+        "name": "provider-outage",
+        "seed": 42
+      },
       "score": {
         "outcome": "inconclusive",
         "rootCause": "missing",
@@ -352,6 +445,16 @@
           "precision": null,
           "recall": 0
         }
+      },
+      "rationale": [
+        "The investigation ended inconclusive, so no diagnosis was scored as correct.",
+        "No root-cause finding; expected payment-provider.",
+        "No finding cites the primary symptom's series (commerce_payment_calls_total) with its labels.",
+        "Affected components not named: payment-provider, worker."
+      ],
+      "grounding": {
+        "citations": 0,
+        "verified": 0
       },
       "resultValid": true,
       "answerLeak": {
@@ -390,6 +493,11 @@
         },
         "selectedRecords": 10
       },
+      "failure": null,
+      "scenario": {
+        "name": "synthetic-cache-saturation",
+        "seed": 7
+      },
       "score": {
         "outcome": "completed",
         "rootCause": "correct",
@@ -406,6 +514,14 @@
           "precision": 1,
           "recall": 1
         }
+      },
+      "rationale": [
+        "Root cause correct: the finding names cache-node.",
+        "A finding cites the primary symptom's series (cache_requests_total)."
+      ],
+      "grounding": {
+        "citations": 4,
+        "verified": 4
       },
       "resultValid": true,
       "answerLeak": {
@@ -441,6 +557,14 @@
         },
         "selectedRecords": 10
       },
+      "failure": {
+        "class": "provider_unavailable",
+        "message": "unavailable after 2 retries: synthetic outage"
+      },
+      "scenario": {
+        "name": "synthetic-cache-saturation",
+        "seed": 7
+      },
       "score": {
         "outcome": "failed",
         "rootCause": "missing",
@@ -454,6 +578,16 @@
           "precision": null,
           "recall": 0
         }
+      },
+      "rationale": [
+        "The investigation ended failed, so no diagnosis was scored as correct.",
+        "No root-cause finding; expected cache-node.",
+        "No finding cites the primary symptom's series (cache_requests_total) with its labels.",
+        "Affected components not named: cache-node, orders-api."
+      ],
+      "grounding": {
+        "citations": 0,
+        "verified": 0
       },
       "resultValid": true,
       "answerLeak": {
@@ -489,7 +623,14 @@
         },
         "selectedRecords": null
       },
+      "failure": {
+        "class": "invalid_bundle",
+        "message": "4 contract issue(s) under rule(s) 4, 9"
+      },
+      "scenario": null,
       "score": null,
+      "rationale": [],
+      "grounding": null,
       "resultValid": true,
       "answerLeak": {
         "checkedRequests": 0,
