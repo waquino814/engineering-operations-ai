@@ -10,7 +10,7 @@ Status: **proposed**, with one owner decision. The portfolio order, this backend
 | ----: | -------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 |     1 | E0 Foundation, E1 intake                                 | complete                                                                        | —                                                                                           |
 |     1 | E2 investigation backend, E3 evaluation: the foundations | foundations delivered (`a65e5b9`); not complete; remaining scope moved to E5–E7 | E1                                                                                          |
-|     2 | **E4 Investigation UI** (current)                        | in progress: implemented; complete when its pushed commit passes CI on GitHub   | E2/E3 foundations and the result contract; **no** provider, credentials or external AI call |
+|     2 | E4 Investigation UI                                      | complete (2026-10-26): commit `43d5987`, CI passed                              | E2/E3 foundations and the result contract; **no** provider, credentials or external AI call |
 |     3 | E5 Provider integration                                  | not started                                                                     | owner approval of ADR 0008 after its verification; credentials and a spending budget        |
 |     4 | E6 End-to-end integration                                | not started                                                                     | E4, E5, and an ADR for the application/API boundary                                         |
 |     5 | E7 Evaluation and hardening                              | not started                                                                     | E6; varied-timing bundles from Commerce Platform for full coverage                          |
@@ -123,13 +123,13 @@ Done when real bundles, including held-out seeds and at least one held-out scena
 
 ## E4: Investigation UI
 
-**Status: in progress (2026-10-26). Implemented, with ADR 0011 accepted; not complete until the commit that delivers it passes GitHub Actions.** Next milestone by the owner's decision of 2026-10-26.
+**Status: complete (2026-10-26).** Delivered in commit `43d5987`; its [GitHub Actions run](https://github.com/waquino814/engineering-operations-ai/actions/runs/40402435901) passed. Built before provider integration by the owner's decision of 2026-10-26.
 
 Progress against the acceptance criteria below:
 
 - [x] 1. UI stack ADR accepted: [ADR 0011](adr/0011-investigation-ui-stack.md), accepted by the owner on 2026-10-26.
 - [x] 2. Every screen and state renders contract-valid fixtures: the overview, new investigation (four fixture bundles, two invalid) and detail views; eight fixture investigations covering completed, repaired, inconclusive, evidence-verification failure, provider failure, budget exceeded and not admitted.
-- [ ] 3. Tests pass in CI on GitHub: they pass locally under `pnpm check`; the GitHub Actions run of the commit that delivers E4 decides this criterion.
+- [x] 3. Tests pass in CI on GitHub: the CI workflow's `pnpm check` job passed on commit `43d5987` ([run 40402435901](https://github.com/waquino814/engineering-operations-ai/actions/runs/40402435901)).
 - [x] 4. Coverage thresholds met for the console's source (per file, 90% lines, 80% branches), unchanged elsewhere.
 - [x] 5. `pnpm eval:synthetic` matches the golden report byte for byte; investigation and evaluation tests unchanged.
 - [x] 6. No provider dependency, credential or external call.
