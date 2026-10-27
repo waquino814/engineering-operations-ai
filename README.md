@@ -21,6 +21,7 @@ pnpm install
 pnpm check                              # format, lint, typecheck, tests with coverage, console build
 pnpm validate-bundle <bundle-dir>       # validate a bundle; exit 0 valid, 1 invalid
 pnpm eval:synthetic                     # synthetic evaluation report; exit 1 on an answer leak
+pnpm eval:suite all                     # versioned dev / held-out suites, offline; exit 1 if the gate fails
 pnpm dev  (= pnpm ui:dev [--port n])    # application (loopback :8787) + console (:5173); data in ~/.engineering-operations-ai.
                                         # Frees its ports of this repo's own earlier dev server/application, never of anything else;
                                         # restarts the application if it stops while the console stays up

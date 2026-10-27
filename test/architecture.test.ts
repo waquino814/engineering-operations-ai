@@ -69,6 +69,7 @@ describe('module boundaries', () => {
       'evaluation/cli.ts',
       'evaluation/ground-truth.ts',
       'evaluation/leakage.ts',
+      'evaluation/suite-cli.ts',
       'evaluation/suites.ts',
       'evaluation/synthetic.ts',
       'evaluation/ui-fixtures.ts',

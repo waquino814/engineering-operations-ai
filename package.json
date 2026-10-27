@@ -21,6 +21,7 @@
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm ui:build",
     "eval:synthetic": "node src/evaluation/cli.ts",
+    "eval:suite": "node src/evaluation/suite-cli.ts",
     "fixtures:ui": "node src/evaluation/ui-fixtures.ts > src/ui/fixtures/fixtures.json",
     "dev": "node scripts/dev.ts",
     "serve": "node src/cli.ts serve",

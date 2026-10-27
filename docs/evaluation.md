@@ -34,6 +34,21 @@ An engineer opens **Evaluations** in the console (or calls the API below), picks
 
 `POST /api/evaluations {suiteId, provider}` runs and stores; `GET /api/evaluations` lists; `GET /api/evaluations/:id` reopens (no rerun); `GET /api/evaluations/:a/compare/:b` compares two runs of one suite and version (cases that regressed, improved or changed; flagged when the providers differ). Runs live in `<data>/evaluations/<id>.json`, are validated against a closed schema on every read, and are listed as unreadable, never repaired, when damaged. Each document records `suite`, `provider`, `measuresModelQuality`, timestamps, `report` (per-case outcome, score, rationale, failure, grounding, duration), `metrics`, `scenarios`, `reliability`, `harnessErrors` and `limitations`.
 
+### From the command line
+
+`pnpm eval:suite <suite-id|all> [--provider scripted|simulated] [--out <file>] [--baseline <file>]` runs the same suites offline, with no server, and prints one JSON document: `runs` (each in the stored-run format above, validated by the same reader) and a `gate`. Only `scripted` and `simulated` are accepted; a real local model runs only through the application's provider gate (ADR 0013), so this command can make no request and cannot spend anything. `--provider ollama` (or any other name) is a usage error and runs nothing.
+
+| Exit code | Meaning                                                                                                                                                           |
+| --------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|         0 | The gate passed.                                                                                                                                                  |
+|         1 | The gate failed: an answer leak, a result that fails its contract, a run the harness could not complete, or (with `--baseline`) a case that is worse than before. |
+|         2 | Usage or input error (unknown suite or option, unreadable baseline, output file already exists). Nothing ran.                                                     |
+|         3 | The development / held-out split was breached. No result is reported.                                                                                             |
+
+The gate is about integrity, not about the diagnoses: the scripted suites contain deliberately wrong, conflicting and fabricated diagnoses, so a wrong root cause there is an expected outcome and does not fail it. `--baseline` takes a document an earlier invocation wrote with `--out` and fails on any case of the same suite, version and provider kind whose root cause, symptom citation or outcome got worse (improvements are reported by the comparison, not counted as problems); a baseline with no run of that suite and kind fails the gate rather than passing silently. `--out` never overwrites an existing file. With a fixed clock the document is byte for byte repeatable; with the real clock, only timestamps and durations differ between invocations.
+
+Passing this gate means the pipeline, verification, scoring and split still behave as recorded. It does not mean any model is good.
+
 ### Metrics
 
 Each has a numerator and a denominator. "Admitted" means the bundle passed intake and was scored; a failed, over-budget or inconclusive admitted case is in the denominator and not in the numerator, and a not-admitted case is out of the diagnosis denominators but still counted in completion, validity and leak counts. An empty denominator is `not_applicable`, never zero.
