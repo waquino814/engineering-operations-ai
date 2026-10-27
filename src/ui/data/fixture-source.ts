@@ -47,6 +47,7 @@ export function createFixtureSource(fixtures: UiFixtures): InvestigationDataSour
         models: [],
         reason: null,
       }),
+    getEvidence: () => Promise.resolve({ status: 'unavailable', reason: 'fixture' }),
     getSettings: () => Promise.resolve({ provider: 'fake', ollamaModel: null, pinned: true }),
     saveSettings: () =>
       Promise.reject(new Error('Settings cannot be saved while the console shows fixtures.')),

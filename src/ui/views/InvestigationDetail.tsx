@@ -8,7 +8,12 @@ import {
   Panel,
   StatusBadge,
 } from '../components.tsx';
-import type { InvestigationDataSource, InvestigationRecord } from '../data/types.ts';
+import type {
+  CitationCheck,
+  EvidenceReport,
+  InvestigationDataSource,
+  InvestigationRecord,
+} from '../data/types.ts';
 import type { FindingVerification, VerifiedFinding } from '../../investigation/result.ts';
 import {
   affectedComponents,
@@ -26,7 +31,7 @@ import {
   verificationText,
 } from '../model.ts';
 import { href } from '../router.ts';
-import { useAsync } from '../use-async.ts';
+import { useAsync, type AsyncState } from '../use-async.ts';
 
 /** Screen C: one investigation, everything the result says and nothing it does not. */
 export function InvestigationDetail({
@@ -55,12 +60,25 @@ export function InvestigationDetail({
           </a>
         </EmptyState>
       )}
-      {state.status === 'ready' && state.value !== null && <Workspace record={state.value} />}
+      {state.status === 'ready' && state.value !== null && (
+        <Workspace record={state.value} source={source} />
+      )}
     </div>
   );
 }
 
-function Workspace({ record }: { record: InvestigationRecord }) {
+function Workspace({
+  record,
+  source,
+}: {
+  record: InvestigationRecord;
+  source: InvestigationDataSource;
+}) {
+  const [evidence, recheck] = useAsync(
+    () =>
+      record.result.findings.length > 0 ? source.getEvidence(record.id) : Promise.resolve(null),
+    [source, record.id],
+  );
   const { result } = record;
   const outcome = outcomeView(result);
   const root = rootCauseSummary(result);
@@ -129,6 +147,7 @@ function Workspace({ record }: { record: InvestigationRecord }) {
           </Panel>
 
           <Panel title="Findings">
+            {result.findings.length > 0 && <EvidenceCheck state={evidence} onRecheck={recheck} />}
             {result.findings.length === 0 ? (
               <p className="muted">
                 {result.outcome === 'inconclusive'
@@ -138,7 +157,15 @@ function Workspace({ record }: { record: InvestigationRecord }) {
             ) : (
               <ol className="findings">
                 {result.findings.map((f) => (
-                  <Finding key={f.id} finding={f} />
+                  <Finding
+                    key={f.id}
+                    finding={f}
+                    citations={
+                      evidence.status === 'ready' && evidence.value?.status === 'checked'
+                        ? evidence.value.citations.filter((c) => c.findingId === f.id)
+                        : null
+                    }
+                  />
                 ))}
               </ol>
             )}
@@ -198,7 +225,95 @@ function Workspace({ record }: { record: InvestigationRecord }) {
   );
 }
 
-function Finding({ finding }: { finding: VerifiedFinding }) {
+const CITATION_TEXT: Record<CitationCheck['status'], string> = {
+  verified: 'Verified: the record is at this line and matches the identifiers quoted',
+  file_changed: 'Not verified: the bundle file has changed since the run',
+  line_missing: 'Not verified: no record at this line',
+  identity_mismatch: 'Not verified: the record does not match the identifiers quoted',
+  unreadable: 'Not verified: the bundle file could not be read',
+};
+
+function CitationCell({ check }: { check: CitationCheck | undefined }) {
+  if (!check) return <span className="muted">Not checked</span>;
+  return (
+    <>
+      <span className={`check check--${check.status === 'verified' ? 'verified' : 'bad'}`}>
+        {CITATION_TEXT[check.status]}
+      </span>
+      {check.issues.map((issue) => (
+        <p key={issue} className="muted small">
+          {issue}
+        </p>
+      ))}
+      {check.excerpt !== null && (
+        <details>
+          <summary>Cited record</summary>
+          <pre className="excerpt">{check.excerpt}</pre>
+          {check.truncated && (
+            <p className="muted small">The record is longer; the start is shown.</p>
+          )}
+        </details>
+      )}
+    </>
+  );
+}
+
+/** Whether the saved result's citations still hold, read from the original bundle, no model. */
+function EvidenceCheck({
+  state,
+  onRecheck,
+}: {
+  state: AsyncState<EvidenceReport | null>;
+  onRecheck: () => void;
+}) {
+  if (state.status === 'loading') return <Loading what="the citations' check against the bundle" />;
+  if (state.status === 'error')
+    return (
+      <ErrorState
+        message={`The citations could not be re-checked: ${state.message}`}
+        onRetry={onRecheck}
+      />
+    );
+  const report = state.value;
+  if (report === null) return null;
+  if (report.status === 'unavailable')
+    return (
+      <p className="notice" role="status">
+        {UNAVAILABLE[report.reason]}
+      </p>
+    );
+  const ok = report.citations.filter((c) => c.status === 'verified').length;
+  return (
+    <p className={`notice ${ok === report.citations.length ? '' : 'notice--error'}`} role="status">
+      Re-checked against the original bundle just now, without running a model:{' '}
+      <strong>
+        {ok} of {report.citations.length} citations verified
+      </strong>
+      . This shows that each cited record exists and matches what was quoted; whether it supports
+      the finding is not assessed.{' '}
+      <button type="button" className="button" onClick={onRecheck}>
+        Check again
+      </button>
+    </p>
+  );
+}
+
+const UNAVAILABLE: Record<Extract<EvidenceReport, { status: 'unavailable' }>['reason'], string> = {
+  not_admitted: 'The bundle was not admitted, so there are no citations to re-check.',
+  no_bundle_recorded:
+    'This run did not record which bundle it used, so its citations cannot be re-checked here.',
+  bundle_not_found:
+    'The bundle this run used is no longer in the bundles directory, so its citations cannot be re-checked.',
+  fixture: 'Fixture runs have no bundle to re-check.',
+};
+
+function Finding({
+  finding,
+  citations,
+}: {
+  finding: VerifiedFinding;
+  citations: CitationCheck[] | null;
+}) {
   return (
     <li className="finding">
       <div className="finding__header">
@@ -226,6 +341,7 @@ function Finding({ finding }: { finding: VerifiedFinding }) {
                 Line
               </th>
               <th scope="col">Identifiers quoted</th>
+              {citations && <th scope="col">Re-checked against the bundle</th>}
             </tr>
           </thead>
           <tbody>
@@ -242,6 +358,13 @@ function Finding({ finding }: { finding: VerifiedFinding }) {
                     ))}
                   </ul>
                 </td>
+                {citations && (
+                  <td>
+                    <CitationCell
+                      check={citations.find((c) => c.file === ref.file && c.line === ref.line)}
+                    />
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

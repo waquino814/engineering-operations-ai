@@ -19,7 +19,15 @@ import {
   writeSettings,
   type Settings,
 } from './settings.ts';
-import { getRun, listRuns, saveRun, type RunEntry, type RunLookup } from './run-store.ts';
+import { checkCitations, type EvidenceReport } from './evidence.ts';
+import {
+  getRun,
+  listRuns,
+  readRunMeta,
+  saveRun,
+  type RunEntry,
+  type RunLookup,
+} from './run-store.ts';
 
 /**
  * The application layer (ADR 0012): the composition root that owns configuration, the provider
@@ -127,6 +135,13 @@ export interface Application {
   getProviderStatus(): Promise<ProviderStatus>;
   startInvestigation(bundleId: string, options?: { signal?: AbortSignal }): Promise<StartOutcome>;
   listRuns(): Promise<RunEntry[]>;
+  /** Re-checks a saved run's citations against the original bundle and returns the cited text. */
+  getEvidence(
+    runId: string,
+  ): Promise<
+    | { status: 'ok'; report: EvidenceReport }
+    | { status: 'error'; reason: 'invalid_run_id' | 'run_not_found' | 'unreadable' }
+  >;
   getRun(runId: string): Promise<RunLookup>;
 }
 
@@ -269,10 +284,23 @@ export function createApplication(env: AppEnv, deps: AppDeps = {}): Application 
         ...(deps.sleep ? { sleep: deps.sleep } : {}),
         ...(signal ? { signal } : {}),
       });
-      const runId = await saveRun(config.runsDir, result, now());
+      const runId = await saveRun(config.runsDir, result, now(), { bundleId });
       return { status: 'done', runId, result };
     },
     listRuns: () => listRuns(config.runsDir),
+    async getEvidence(runId) {
+      const run = await getRun(config.runsDir, runId);
+      if (!run.ok) return { status: 'error', reason: run.reason };
+      if (run.result.bundle === null)
+        return { status: 'ok', report: { status: 'unavailable', reason: 'not_admitted' } };
+      const meta = await readRunMeta(config.runsDir, runId);
+      if (meta === null)
+        return { status: 'ok', report: { status: 'unavailable', reason: 'no_bundle_recorded' } };
+      const found = await resolveBundle(config.bundlesDir, meta.bundleId);
+      if (!found.ok)
+        return { status: 'ok', report: { status: 'unavailable', reason: 'bundle_not_found' } };
+      return { status: 'ok', report: await checkCitations(found.dir, run.result) };
+    },
     getRun: (runId) => getRun(config.runsDir, runId),
   };
 }

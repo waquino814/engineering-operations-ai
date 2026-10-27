@@ -12,6 +12,8 @@ export interface AnswerKey {
   scenario: string;
   rootCauseComponent: string;
   affectedComponents: string[];
+  /** The metric series that shows the fault, as the bundle contract states it. */
+  primarySymptom: { metric: string; matchers: Record<string, string> };
 }
 
 export async function readAnswerKey(bundleDir: string): Promise<AnswerKey> {
@@ -28,5 +30,9 @@ export async function readAnswerKey(bundleDir: string): Promise<AnswerKey> {
     scenario: scenario.name,
     rootCauseComponent: rootCause.component,
     affectedComponents: [...(value.affectedComponents as string[])].sort(),
+    primarySymptom: {
+      metric: (value.primarySymptom as { metric: string }).metric,
+      matchers: (value.primarySymptom as { matchers: Record<string, string> }).matchers,
+    },
   };
 }

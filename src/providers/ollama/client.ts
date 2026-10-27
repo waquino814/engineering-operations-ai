@@ -62,7 +62,7 @@ export interface OllamaHttp {
   post(path: string, body: unknown, signal?: AbortSignal): Promise<OllamaReply>;
 }
 
-const PATHS = new Set(['/api/tags', '/api/show', '/api/chat']);
+const PATHS = new Set(['/api/tags', '/api/show', '/api/status', '/api/chat']);
 
 export function createOllamaHttp(endpoint: URL, fetchImpl: FetchLike): OllamaHttp {
   const call = async (

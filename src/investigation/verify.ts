@@ -85,7 +85,7 @@ export function traceServices(record: unknown): string[] {
   return [...names].sort();
 }
 
-function checkIdentity(
+export function checkIdentity(
   file: TelemetryFile,
   ref: EvidenceReference,
   record: unknown,

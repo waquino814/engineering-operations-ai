@@ -8,18 +8,18 @@ Status: **proposed**, with one owner decision. The portfolio order, this backend
 
 > **Absolute no-additional-spending constraint:** No application path, configuration setting, provider selector, UI control, or command-line option may initiate a hosted AI request or incur additional AI-service charges. Only deterministic fake execution and verified local-only inference are permitted. If local-only operation cannot be verified, execution must fail closed.
 
-It overrides every milestone below. The runnable application may allow only `fake` and `local` ([ADR 0013](adr/0013-zero-spend-local-inference.md), proposed); the hosted adapter stays in the repository but unreachable.
+It overrides every milestone below. The runnable application may allow only `fake` and `ollama` ([ADR 0013](adr/0013-zero-spend-local-inference.md), partly accepted); the hosted adapter stays in the repository but unreachable.
 
 **Owner decision (2026-10-26): build the investigation UI before integrating a real AI provider.** Milestone IDs are stable: completed and in-progress records keep their numbers, and the scope still open in E2 and E3 moves to new milestones E5 to E7.
 
-| Order | Milestone                                                | Status                                                                          | Depends on                                                                                  |
-| ----: | -------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-|     1 | E0 Foundation, E1 intake                                 | complete                                                                        | —                                                                                           |
-|     1 | E2 investigation backend, E3 evaluation: the foundations | foundations delivered (`a65e5b9`); not complete; remaining scope moved to E5–E7 | E1                                                                                          |
-|     2 | E4 Investigation UI                                      | complete (2026-10-26): commit `43d5987`, CI passed                              | E2/E3 foundations and the result contract; **no** provider, credentials or external AI call |
-|     3 | E5 Provider integration                                  | in progress; local Ollama provider working (2026-10-27)                         | the no-spending policy; ADR 0013 (partly accepted); no credentials                          |
-|     4 | E6 End-to-end integration                                | not started; ADR 0012 partly accepted                                           | E4, the application boundary (ADR 0012), a permitted provider (`fake` or verified `local`)  |
-|     5 | E7 Evaluation and hardening                              | not started                                                                     | E6; varied-timing bundles from Commerce Platform for full coverage                          |
+| Order | Milestone                                                | Status                                                                                 | Depends on                                                                                  |
+| ----: | -------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+|     1 | E0 Foundation, E1 intake                                 | complete                                                                               | —                                                                                           |
+|     1 | E2 investigation backend, E3 evaluation: the foundations | foundations delivered (`a65e5b9`); not complete; remaining scope moved to E5–E7        | E1                                                                                          |
+|     2 | E4 Investigation UI                                      | complete (2026-10-26): commit `43d5987`, CI passed                                     | E2/E3 foundations and the result contract; **no** provider, credentials or external AI call |
+|     3 | E5 Provider integration                                  | in progress; Ollama provider implemented, blocked on this machine by its cloud setting | the no-spending policy; ADR 0013 (partly accepted); no credentials                          |
+|     4 | E6 End-to-end integration                                | in progress; ADR 0012 partly accepted                                                  | E4, the application boundary (ADR 0012), a permitted provider (`fake` or verified `local`)  |
+|     5 | E7 Evaluation and hardening                              | not started                                                                            | E6; varied-timing bundles from Commerce Platform for full coverage                          |
 
 Why this order is consistent with the decisions in force:
 
@@ -86,14 +86,14 @@ Completed (foundation):
 - [x] Truncated traces reported as limitations.
 - [x] A total token budget across all calls, charging unreported usage at configured ceilings ([ADR 0006](adr/0006-investigation-pipeline-and-limits.md)); tested with fake usage reports only.
 - [x] References restricted to the records actually sent to the model; separate verification statements, semantic support marked not assessed ([ADR 0007](adr/0007-evidence-grounding-and-output-validation.md)).
-- [x] Result states, compatibility policy and consumer reader, with tests for every state and malformed combination ([ADR 0010](adr/0010-investigation-result-contract-v0.md), proposed).
+- [x] Result states, compatibility policy and consumer reader, with tests for every state and malformed combination ([ADR 0010](adr/0010-investigation-result-contract-v0.md), accepted).
 - [x] Tests for each of the above, with no network; module boundaries enforced ([docs/testing.md](testing.md)).
 
 In progress or blocked:
 
 - [ ] **Owner review** of proposed ADRs 0006 to 0008.
 - [x] ADR 0010 and its amendment to ADR 0004 (no `failure` on `inconclusive`), accepted by the owner on 2026-10-26.
-- [ ] **Blocked on the owner's decision:** a real provider adapter. [ADR 0008](adr/0008-model-provider-recommendation.md) recommends one; implementing it needs approval, a credential, and an agreed budget.
+- [x] A real provider adapter: superseded by the no-spending policy (2026-10-27). The hosted adapter stays unreachable; the local Ollama provider (E5) is the real-provider route, and it is blocked on a machine whose Ollama reports its cloud features enabled.
 - [ ] Token budget in production: needs an adapter that maps its provider's usage fields and confirms `maxInputTokensPerCall` against the provider's tokenizer ([ADR 0008](adr/0008-model-provider-recommendation.md), "Verification required before approval").
 - [ ] Verification of ADR 0008's provider facts against current official documentation.
 - [ ] A real bundle investigated by a real model, with a verified result.
@@ -183,12 +183,15 @@ An operator-facing investigation console, inside this repository, built on deter
 
 ## E5: Provider integration
 
-**Status: in progress (revised 2026-10-27).** The local Ollama provider (`src/providers/ollama/`) and the simulated Fake provider are implemented and selectable in Settings (ADR 0013). **One real run, 2026-10-27:** `gemma4:12b` through the local Ollama, started from the console's API on the synthetic provider-outage bundle, completed with 3 verified findings (root cause: the payment provider's `provider_unavailable` errors on the worker) in 1 call and 85.6 s, 8,981 input and 1,049 output tokens, every citation checked against the bundle's lines. Earlier attempts failed honestly: with the default context budget the selection was empty and the model said it had no evidence (a limits bug, fixed), and a reply with invalid JSON or wrong reference ids was rejected after the bounded repair. This is one run on a synthetic bundle, not a quality evaluation. Under the no-spending policy, E5 no longer integrates a hosted provider. Delivered so far, with no network: the Anthropic adapter, mapping, derived schema and provider selection, with stubbed-client tests. [ADR 0008](adr/0008-model-provider-recommendation.md) is superseded in part: the adapter stays in the repository but must be unreachable from runnable execution, and its funded evaluation is withdrawn. **Out of scope:** hosted-provider verification, credentials, budgets, and any work that needs spending.
+**Status: in progress (revised 2026-10-27).** Implemented: the simulated Fake provider and the local Ollama provider (`src/providers/ollama/`), selectable and saved in Settings (ADR 0013), with the console showing who produced each run. Hosted providers are out under the no-spending policy: [ADR 0008](adr/0008-model-provider-recommendation.md) is superseded in part, its adapter stays in the repository but unreachable, and its funded evaluation is withdrawn.
+
+**Local-only check, tightened on 2026-10-27:** before any prompt, the adapter now requires the runtime's own report, `GET /api/status`, to say its cloud features are **disabled**, in addition to the model being installed with local weights and known metadata. On the development machine Ollama 0.40.11 reports `{"cloud":{"disabled":false,"source":"none"}}`, so **real local inference is blocked there**: the application says so in Settings and on Start, names `OLLAMA_NO_CLOUD=1` / `"disable_ollama_cloud": true` as what the operator must change (and restart Ollama), sends nothing, and stores nothing (checked live: the Ollama server log shows no chat request). It never changes Ollama's settings. This is the runtime's report of its own setting, not proof about its code or network. **One real run exists, from before this check** (2026-10-27, under a weaker check): `gemma4:12b`, the synthetic provider-outage bundle, 3 verified findings in 1 call and 85.6 s; its root cause was named on the worker component while the answer key's is the payment provider, so scoring v0.1 would call it incorrect. It is one run on a synthetic bundle, not a quality evaluation.
 
 Scope, [ADR 0013](adr/0013-zero-spend-local-inference.md) (partly accepted):
 
 - Done: a provider allowlist, `fake` and `ollama`, in the application layer, with tests that every other name (hosted ones, the retired `local`) is refused; a settings file and Settings page that save the choice; a loopback-only Ollama adapter with injected-client tests and a local-only verification that runs before any prompt (no Ollama, model or network in CI); the deterministic labelled simulation; failure handling for an unavailable runtime, a missing or unverifiable model, malformed or empty replies, invented citations, timeouts and cancellation.
-- Open: the Ollama server's own cloud setting cannot be verified from outside (`OLLAMA_NO_CLOUD=0` on the development machine); the full set of remote markers Ollama may add; whether the schema constraint is honoured in every case (the investigator validates regardless); a measured quality evaluation on real bundles with the chosen model (E7); excerpts of cited records in the report.
+- Done since: excerpts of cited records, re-checked against the original bundle on demand, with the bundle's checksum (`GET /api/runs/:id/evidence`, shown on the detail page).
+- Open: owner review of the local-only check; the full set of remote markers and status fields Ollama may add (an unknown field blocks); whether the schema constraint is honoured in every case (the investigator validates regardless); a real run under the tightened check, which needs the operator to disable Ollama's cloud features first; a measured quality evaluation on real bundles with the chosen model (E7).
 
 Done when the allowlist and provider pass their tests, the local-only check is reviewed by the owner, ADR 0013 is accepted, and the quality of a local model on real bundles has been evaluated. No hosted evaluation is a completion criterion. Not complete.
 
@@ -196,22 +199,22 @@ Done when the allowlist and provider pass their tests, the local-only check is r
 
 **Status: in progress.** [ADR 0012](adr/0012-application-boundary.md) (partly accepted) and the provider allowlist in [ADR 0013](adr/0013-zero-spend-local-inference.md) are implemented locally and pushed: the application layer (configuration, bundle access, run store, orchestration), the `investigate` and `serve` commands, the loopback HTTP API, and the console on it. `pnpm ui:dev` or `pnpm dev` (the same command) starts the application and then the console together with data under `~/.engineering-operations-ai/`; it first frees its two ports of this repository's own earlier dev server or application (checking `127.0.0.1` and `::1`, because a stale server on `[::1]` shadows a new one on `127.0.0.1` for `localhost`), refuses and names any other holder, and restarts the application if it stops. Settings selects `Fake` (simulated output, labelled) or `Ollama` (a verified local model; real investigations run through it), persisted across restarts. Real-process end-to-end tests are in `test/e2e/`. **Not done:** uploads, a second local model's evaluation, diagnostic quality measurement (E7), excerpts of cited records in the report. After E4 and E5.
 
-Proposed sequence ([ADR 0013](adr/0013-zero-spend-local-inference.md)): **E6a** application boundary, then a verified local provider, then a configuration UI, then a separately decided server and further hardening.
-
 - The application layer owns configuration, provider construction, the provider gate, run storage and orchestration; startup is request-free; the investigator never chooses a provider (ADR 0003 isolation kept).
 - Implement it with tests. The UI is connected to it over the loopback server; fixtures remain available by build option.
-- Live end-to-end investigation requires this boundary and a permitted provider (`fake`, or `local` once verified); until then the UI shows fixtures only.
+- Live end-to-end investigation runs through this boundary with a permitted provider: `fake` always (simulated, labelled), `ollama` only when its local-only check passes.
 
-Done when an operator can validate a real bundle, start an investigation with a permitted provider (verified `local`), and see the result in the UI, with tests for the boundary passing in CI. Not complete; the criterion cannot be met until a local provider is verified and the integration route is decided.
+Done when an operator can validate a real bundle, start an investigation with a permitted provider, and see the result in the UI, with tests for the boundary passing in CI. **Met for `fake`** (simulated output), exercised through the real processes and in CI; **not yet met for a real local model** on the development machine, where the local-only check blocks `ollama` (see E5). A real Commerce Platform bundle has not been used; the committed excerpt and synthetic bundles have. Not complete.
 
 ## E7: Evaluation and hardening
 
-**Status: not started.** After E6. Carries forward E3's real-model scope.
+**Status: started (synthetic scoring only); the real-model scope is not started.** After E6. Carries forward E3's real-model scope.
 
 - Diagnostic quality: score real diagnoses per scenario, with held-out seeds and at least one held-out scenario ([ADR 0009](adr/0009-evaluation-harness-and-scoring.md)); symptom and remediation scoring; whether evidence semantically supports findings.
 - Security boundaries: re-run the leak checks and isolation tests against the live path; review the API boundary.
 - Reliability, observability and operational behaviour: provider failures, budgets and timeouts in live runs; logging and metrics that carry no telemetry content or credentials.
 - Approval workflows and evaluation-result views in the UI (Commerce Platform ADR 0004).
 - Depends on Commerce Platform for bundles with varied fault timing (ADR 0003, "Remaining risks").
+
+Delivered so far (synthetic only, 2026-10-27): scoring v0.1 adds `ambiguous` root causes (conflicting claims) and whether the primary symptom's series is cited, with two new cases and a regenerated golden report (10 cases). Remediation is not scored: the answer key's `expectedRemediation` is free text with no objective comparison defined. Cite-and-recheck of a saved run's citations against its bundle is in the product (E5/E6). Not done: any real-model scoring, held-out seeds or scenarios (the repository has one real excerpt, fixed timing), and the hardening items.
 
 Done when real-model results are scored repeatably with a per-scenario report, and the hardening items have tests in CI.

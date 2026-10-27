@@ -61,6 +61,7 @@ describe('module boundaries', () => {
     expect(fsUsers).toEqual([
       'app/bundles.ts',
       'app/data-dirs.ts',
+      'app/evidence.ts',
       'app/http-server.ts',
       'app/run-store.ts',
       'app/settings.ts',

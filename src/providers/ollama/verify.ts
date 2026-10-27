@@ -8,12 +8,21 @@ import type { OllamaHttp } from './client.ts';
  * cloud marker, say) blocks the model rather than being guessed at.
  *
  * What this establishes: the model named is a locally installed model whose weights are on this
- * machine, served by the runtime on a loopback address. What it cannot establish: the runtime's
- * own configuration (OLLAMA_NO_CLOUD is not visible from outside), so no claim is made about it.
+ * machine, served by a runtime on a loopback address that reports its cloud features as
+ * **disabled** (`GET /api/status`, `{"cloud":{"disabled":true,...}}`). Loopback and local
+ * weights alone do not show that a runtime cannot reach a hosted service, so a runtime whose
+ * cloud features are enabled, or that does not report them, is blocked before any prompt. This
+ * is the runtime's own report of its own setting: it is not proof about its code or network, and
+ * it is read once per investigation, not monitored. The application never changes Ollama's
+ * settings; the operator does, and the message says how.
  */
 export const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 /** Real weights are far larger; a stub that merely points elsewhere would not be. */
 const MIN_WEIGHTS_BYTES = 10_000_000;
+
+/** Exactly what `GET /api/status` reports about cloud features (Ollama 0.40, checked 2026-10-27). */
+export const CLOUD_DISABLE_HELP =
+  'To use a local model, disable Ollama\'s cloud features yourself (set OLLAMA_NO_CLOUD=1, or "disable_ollama_cloud": true in ~/.ollama/server.json) and restart Ollama. This application never changes Ollama\'s settings.';
 
 const TAGS_KEYS = new Set([
   'name',
@@ -55,6 +64,8 @@ export interface VerifiedLocalModel {
 export type LocalModelCode =
   | 'ollama_unreachable'
   | 'bad_response'
+  | 'cloud_not_disabled'
+  | 'cloud_status_unknown'
   | 'no_models'
   | 'model_not_selected'
   | 'model_not_installed'
@@ -114,6 +125,40 @@ export async function verifyLocalModel(
     return fail(
       'no_models',
       'Ollama has no installed model. Install one yourself; this application never downloads models.',
+      installed,
+    );
+
+  // The runtime's own report of its cloud setting, before any model is considered.
+  let status;
+  try {
+    status = await http.get('/api/status', signal);
+  } catch {
+    return fail(
+      'ollama_unreachable',
+      `Ollama stopped answering at ${http.endpoint}. Nothing was run.`,
+      installed,
+    );
+  }
+  const cloud =
+    isObject(status.body) && Object.keys(status.body).length === 1
+      ? status.body['cloud']
+      : undefined;
+  if (
+    status.status !== 200 ||
+    !isObject(cloud) ||
+    typeof cloud['disabled'] !== 'boolean' ||
+    typeof cloud['source'] !== 'string' ||
+    Object.keys(cloud).length !== 2
+  )
+    return fail(
+      'cloud_status_unknown',
+      `This Ollama does not report whether its cloud features are disabled in a form this application understands, so it cannot be shown to be local-only. Nothing was sent. ${CLOUD_DISABLE_HELP}`,
+      installed,
+    );
+  if (!cloud['disabled'])
+    return fail(
+      'cloud_not_disabled',
+      `Ollama's cloud features are enabled on this machine (source: ${cloud['source'] === 'none' ? 'not set' : cloud['source'].slice(0, 40)}), so a prompt could be routed to a hosted service; local-only operation cannot be shown. Nothing was sent. ${CLOUD_DISABLE_HELP}`,
       installed,
     );
 

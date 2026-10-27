@@ -87,13 +87,54 @@ describe('local-only verification', () => {
     expect(two).toMatchObject({ ok: true, model: { name: 'b:2b' } });
   });
 
-  it('never sends a prompt, a pull or anything but two metadata reads', async () => {
+  it('never sends a prompt, a pull or anything but three metadata reads', async () => {
     const stub = ollamaStub();
     await verifyLocalModel(http(stub), null);
     expect(stub.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
       'GET /api/tags',
+      'GET /api/status',
       'POST /api/show',
     ]);
+  });
+
+  describe('the runtime must report its cloud features as disabled', () => {
+    type Status = NonNullable<NonNullable<Parameters<typeof ollamaStub>[0]>['status']>;
+    const verifyWith = (status: Status) => verifyLocalModel(http(ollamaStub({ status })), null);
+
+    it('blocks a runtime whose cloud features are enabled, naming the setting to change, before any model check', async () => {
+      const stub = ollamaStub({ status: { body: { cloud: { disabled: false, source: 'none' } } } });
+      const r = await verifyLocalModel(http(stub), null);
+      expect(r).toMatchObject({ ok: false, code: 'cloud_not_disabled', installed: ['tiny:1b'] });
+      if (!r.ok) {
+        expect(r.message).toContain('OLLAMA_NO_CLOUD=1');
+        expect(r.message).toContain('Nothing was sent');
+      }
+      // The model's metadata was not even read.
+      expect(stub.calls.map((c) => c.path)).toEqual(['/api/tags', '/api/status']);
+    });
+
+    it.each<[string, Status]>([
+      ['an older runtime without the endpoint', { status: 404, body: { error: 'not found' } }],
+      ['a server error', { status: 500, body: {} }],
+      ['a body that is not an object', { body: 'ok' }],
+      ['no cloud field', { body: {} }],
+      ['an unknown extra field', { body: { cloud: { disabled: true, source: 'env' }, other: 1 } }],
+      [
+        'an unknown cloud field',
+        { body: { cloud: { disabled: true, source: 'env', signedIn: false } } },
+      ],
+      ['a non-boolean flag', { body: { cloud: { disabled: 'yes', source: 'env' } } }],
+      ['a missing source', { body: { cloud: { disabled: true } } }],
+    ])('blocks %s as unknown, never as local', async (_why, status) => {
+      expect(await verifyWith(status)).toMatchObject({ ok: false, code: 'cloud_status_unknown' });
+    });
+
+    it('accepts a runtime that reports cloud disabled, whatever the stated source', async () => {
+      for (const source of ['env', 'config'])
+        expect(await verifyWith({ body: { cloud: { disabled: true, source } } })).toMatchObject({
+          ok: true,
+        });
+    });
   });
 
   it.each<[string, StubModel[], string | null, string]>([
@@ -151,7 +192,7 @@ describe('local-only verification', () => {
     const base = ollamaStub();
     let n = 0;
     const flaky: FetchLike = (input, init) =>
-      ++n === 2 ? Promise.reject(new Error('gone')) : base.fetch(input, init);
+      ++n === 3 ? Promise.reject(new Error('gone')) : base.fetch(input, init);
     expect(
       await verifyLocalModel(createOllamaHttp(resolveOllamaEndpoint(undefined), flaky), null),
     ).toMatchObject({ code: 'ollama_unreachable' });

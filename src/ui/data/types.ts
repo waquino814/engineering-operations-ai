@@ -81,6 +81,25 @@ export interface ProviderStatus {
   reason: string | null;
 }
 
+/** A saved result's citation, re-checked against the original bundle (never rerunning a model). */
+export interface CitationCheck {
+  findingId: string;
+  file: string;
+  line: number;
+  status: 'verified' | 'file_changed' | 'line_missing' | 'identity_mismatch' | 'unreadable';
+  /** The cited record's text, present only when the bundle file is unchanged. */
+  excerpt: string | null;
+  truncated: boolean;
+  issues: string[];
+}
+
+export type EvidenceReport =
+  | { status: 'checked'; citations: CitationCheck[] }
+  | {
+      status: 'unavailable';
+      reason: 'not_admitted' | 'no_bundle_recorded' | 'bundle_not_found' | 'fixture';
+    };
+
 export interface ProviderSettings {
   provider: 'fake' | 'ollama';
   ollamaModel: string | null;
@@ -96,6 +115,8 @@ export interface InvestigationDataSource {
   readonly description: { mode: Origin; notice: string };
   getProviderStatus(): Promise<ProviderStatus>;
   getSettings(): Promise<ProviderSettings>;
+  /** Re-checks the citations of a saved investigation and returns the cited text. */
+  getEvidence(id: string): Promise<EvidenceReport>;
   /** Rejects when the application refuses the choice; never falls back to another provider. */
   saveSettings(input: {
     provider: 'fake' | 'ollama';

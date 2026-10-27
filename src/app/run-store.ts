@@ -32,11 +32,41 @@ export type RunLookup =
 
 const stamp = (ms: number) => new Date(ms).toISOString().replace(/[-:]|\.\d{3}/g, '');
 
+/**
+ * Operator-side metadata kept beside a run, never inside the result (ADR 0003, 0012: a result
+ * names no bundle, path or scenario). It lets the application find the original bundle again to
+ * re-check citations. `<id>.meta.json` is not a run id, so listings never see it.
+ */
+export interface RunMeta {
+  bundleId: string;
+}
+
+export async function readRunMeta(dir: string, id: string): Promise<RunMeta | null> {
+  if (!RUN_ID.test(id)) return null;
+  try {
+    const file = join(dir, `${id}.meta.json`);
+    const info = await lstat(file);
+    if (!info.isFile() || info.size > 4_096) return null;
+    const doc: unknown = JSON.parse(await readFile(file, 'utf8'));
+    if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) return null;
+    const keys = Object.keys(doc);
+    const bundleId = (doc as Record<string, unknown>)['bundleId'];
+    return keys.length === 2 &&
+      (doc as Record<string, unknown>)['version'] === 1 &&
+      typeof bundleId === 'string'
+      ? { bundleId }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Writes the result under a new id, atomically, and never over an existing run. */
 export async function saveRun(
   dir: string,
   result: InvestigationResult,
   nowMs: number,
+  meta?: RunMeta,
 ): Promise<string> {
   const check = readInvestigationResult(result);
   if (!check.ok) throw new Error('refusing to store a result that fails the contract');
@@ -50,6 +80,13 @@ export async function saveRun(
       try {
         // A hard link fails if the target exists, so a run is never replaced.
         await link(tmp, join(dir, `${id}.json`));
+        // The sidecar is written after the run: a run without one simply has no excerpts.
+        if (meta)
+          await writeFile(
+            join(dir, `${id}.meta.json`),
+            `${JSON.stringify({ version: 1, ...meta })}\n`,
+            { flag: 'wx' },
+          );
         return id;
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;

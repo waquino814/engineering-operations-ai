@@ -68,7 +68,11 @@ describe('src/cli.ts investigate, as a real subprocess', () => {
         env: w.env(extra),
       });
       expect(r.stdout).toMatch(/^run \d{8}T\d{6}Z-[0-9a-f]{16}: completed, 1 finding\(s\)/);
-      expect(await readdir(w.runsDir)).toHaveLength(1);
+      // The run, and the sidecar that names its bundle for the citation re-check.
+      expect((await readdir(w.runsDir)).map((n) => n.replace(/^[^.]+/, '')).sort()).toEqual([
+        '.json',
+        '.meta.json',
+      ]);
     },
   );
 

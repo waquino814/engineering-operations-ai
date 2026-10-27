@@ -266,6 +266,13 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
       return send(res, 200, { bundles: (await app.listBundles()).map((id) => ({ id })) });
     }
+    const evidence = /^\/api\/runs\/([^/]+)\/evidence$/.exec(path);
+    if (evidence) {
+      if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });
+      const out = await app.getEvidence(safeDecode(evidence[1]));
+      if (out.status === 'ok') return send(res, 200, { ...out.report });
+      return fail(res, out.reason === 'unreadable' ? 'run_unreadable' : out.reason);
+    }
     const run = /^\/api\/runs\/([^/]+)$/.exec(path);
     if (run) {
       if (method !== 'GET') return fail(res, 'method_not_allowed', { allow: 'GET' });

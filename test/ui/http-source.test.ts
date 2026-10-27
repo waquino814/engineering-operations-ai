@@ -185,6 +185,55 @@ describe('provider status and settings', () => {
   });
 });
 
+describe('evidence re-check', () => {
+  const citation = {
+    findingId: 'F1',
+    file: 'logs.jsonl',
+    line: 2,
+    status: 'verified',
+    excerpt: '{"a":1}',
+    truncated: false,
+    issues: [],
+  };
+
+  it('reads the checked citations and the reasons nothing could be checked', async () => {
+    const a = stub({
+      '/api/runs/r1/evidence': { body: { status: 'checked', citations: [citation] } },
+    });
+    expect(await a.source.getEvidence('r1')).toEqual({ status: 'checked', citations: [citation] });
+    for (const reason of ['not_admitted', 'no_bundle_recorded', 'bundle_not_found']) {
+      const b = stub({ '/api/runs/r1/evidence': { body: { status: 'unavailable', reason } } });
+      expect(await b.source.getEvidence('r1')).toEqual({ status: 'unavailable', reason });
+    }
+  });
+
+  it.each([
+    [{ status: 'unavailable', reason: 'fixture' }],
+    [{ status: 'unavailable' }],
+    [{ status: 'other' }],
+    [{ status: 'checked', citations: 'x' }],
+    [{ status: 'checked', citations: [{ ...citation, status: 'great' }] }],
+    [{ status: 'checked', citations: [{ ...citation, line: '2' }] }],
+    [{ status: 'checked', citations: [{ ...citation, excerpt: 3 }] }],
+    [{ status: 'checked', citations: [{ ...citation, issues: [1] }] }],
+    [{ status: 'checked', citations: [null] }],
+  ])('rejects a malformed evidence answer %#', async (body) => {
+    const { source } = stub({ '/api/runs/r1/evidence': { body } });
+    await expect(source.getEvidence('r1')).rejects.toThrow(/malformed/);
+  });
+
+  it('escapes the id and reports a missing run or a server error as errors', async () => {
+    const { source, calls } = stub({
+      '/api/runs/a%2Fb/evidence': {
+        status: 404,
+        body: { error: { code: 'run_not_found', message: 'no such run' } },
+      },
+    });
+    await expect(source.getEvidence('a/b')).rejects.toThrow('no such run');
+    expect(calls[0]?.url).toBe('/api/runs/a%2Fb/evidence');
+  });
+});
+
 describe('bundles', () => {
   it('lists bundles and validates one', async () => {
     const check = { valid: true, schemaVersion: '1.0.0', issues: [], metadata: null };

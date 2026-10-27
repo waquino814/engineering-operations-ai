@@ -279,6 +279,28 @@ export async function syntheticCases(b: SyntheticBundles): Promise<EvaluationCas
       },
     ],
   });
+  const conflicting = output({
+    findings: [
+      ...correct.findings.slice(0, 1),
+      {
+        id: 'F2',
+        kind: 'root_cause',
+        statement: 'The orders API fails to create orders.',
+        components: ['orders-api'],
+        confidence: 'low',
+        rationale: 'A second, conflicting claim, to exercise scoring of an ambiguous diagnosis.',
+        evidence: [await cite(b.excerpt, 'logs.jsonl', 1)],
+      },
+    ],
+  });
+  const logsOnly = output({
+    findings: [
+      {
+        ...(correct.findings[0] as ModelOutput['findings'][number]),
+        evidence: [await cite(b.excerpt, 'logs.jsonl', 3)],
+      },
+    ],
+  });
   const fabricatedEvidence = output({
     findings: [
       {
@@ -332,6 +354,18 @@ export async function syntheticCases(b: SyntheticBundles): Promise<EvaluationCas
       kind: 'synthetic',
       bundleDir: b.excerpt,
       provider: fake([{ reply: wrong }]),
+    },
+    {
+      id: 'excerpt-conflicting-root-causes',
+      kind: 'synthetic',
+      bundleDir: b.excerpt,
+      provider: fake([{ reply: conflicting }]),
+    },
+    {
+      id: 'excerpt-correct-without-symptom-evidence',
+      kind: 'synthetic',
+      bundleDir: b.excerpt,
+      provider: fake([{ reply: logsOnly }]),
     },
     {
       id: 'excerpt-repaired-reply',

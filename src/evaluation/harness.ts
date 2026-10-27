@@ -49,6 +49,12 @@ export interface EvaluationReport {
     cases: number;
     byOutcome: Record<string, number>;
     rootCauseCorrect: number;
+    /** Cases whose result names more than one root-cause component. */
+    rootCauseAmbiguous: number;
+    /** Cases where a finding cites the series of the primary symptom (scoring v0.1). */
+    symptomEvidenceCovered: number;
+    /** Cases the pipeline rejected because a citation did not hold. */
+    rejectedForEvidence: number;
     answerLeaks: number;
   };
 }
@@ -147,6 +153,11 @@ export async function runEvaluation(cases: EvaluationCase[]): Promise<Evaluation
       cases: reports.length,
       byOutcome,
       rootCauseCorrect: reports.filter((r) => r.score?.rootCause === 'correct').length,
+      rootCauseAmbiguous: reports.filter((r) => r.score?.rootCause === 'ambiguous').length,
+      symptomEvidenceCovered: reports.filter((r) => r.score?.symptomEvidence === 'covered').length,
+      rejectedForEvidence: reports.filter(
+        (r) => r.summary.failureClass === 'evidence_verification_failed',
+      ).length,
       answerLeaks: reports.filter((r) => r.answerLeak.leaked).length,
     },
   };

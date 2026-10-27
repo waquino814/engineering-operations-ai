@@ -32,6 +32,7 @@
       "score": {
         "outcome": "completed",
         "rootCause": "correct",
+        "symptomEvidence": "covered",
         "affected": {
           "predicted": [
             "payment-provider",
@@ -84,6 +85,7 @@
       "score": {
         "outcome": "completed",
         "rootCause": "incorrect",
+        "symptomEvidence": "not_covered",
         "affected": {
           "predicted": [
             "orders-api"
@@ -94,6 +96,111 @@
           ],
           "precision": 0,
           "recall": 0
+        }
+      },
+      "resultValid": true,
+      "answerLeak": {
+        "checkedRequests": 1,
+        "checkedValues": 54,
+        "legitimatelyPresent": 6,
+        "leaked": false,
+        "findings": []
+      }
+    },
+    {
+      "id": "excerpt-conflicting-root-causes",
+      "kind": "synthetic",
+      "summary": {
+        "caseId": "ec2275bde9750840",
+        "outcome": "completed",
+        "failureClass": null,
+        "findings": 2,
+        "findingsByKind": {
+          "root_cause": 2
+        },
+        "references": 3,
+        "remediationSteps": 0,
+        "limitations": 0,
+        "usage": {
+          "modelCalls": 1,
+          "repairAttempts": 0,
+          "retries": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "chargedTokens": 204000,
+          "unreportedCalls": 1,
+          "inconsistentReports": 0,
+          "tokenAccounting": "estimated"
+        },
+        "selectedRecords": 8
+      },
+      "score": {
+        "outcome": "completed",
+        "rootCause": "ambiguous",
+        "symptomEvidence": "covered",
+        "affected": {
+          "predicted": [
+            "orders-api",
+            "payment-provider"
+          ],
+          "expected": [
+            "payment-provider",
+            "worker"
+          ],
+          "precision": 0.5,
+          "recall": 0.5
+        }
+      },
+      "resultValid": true,
+      "answerLeak": {
+        "checkedRequests": 1,
+        "checkedValues": 54,
+        "legitimatelyPresent": 6,
+        "leaked": false,
+        "findings": []
+      }
+    },
+    {
+      "id": "excerpt-correct-without-symptom-evidence",
+      "kind": "synthetic",
+      "summary": {
+        "caseId": "ec2275bde9750840",
+        "outcome": "completed",
+        "failureClass": null,
+        "findings": 1,
+        "findingsByKind": {
+          "root_cause": 1
+        },
+        "references": 1,
+        "remediationSteps": 0,
+        "limitations": 0,
+        "usage": {
+          "modelCalls": 1,
+          "repairAttempts": 0,
+          "retries": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "chargedTokens": 204000,
+          "unreportedCalls": 1,
+          "inconsistentReports": 0,
+          "tokenAccounting": "estimated"
+        },
+        "selectedRecords": 8
+      },
+      "score": {
+        "outcome": "completed",
+        "rootCause": "correct",
+        "symptomEvidence": "not_covered",
+        "affected": {
+          "predicted": [
+            "payment-provider"
+          ],
+          "expected": [
+            "payment-provider",
+            "worker"
+          ],
+          "precision": 1,
+          "recall": 0.5
         }
       },
       "resultValid": true,
@@ -136,6 +243,7 @@
       "score": {
         "outcome": "completed",
         "rootCause": "correct",
+        "symptomEvidence": "covered",
         "affected": {
           "predicted": [
             "payment-provider",
@@ -186,6 +294,7 @@
       "score": {
         "outcome": "failed",
         "rootCause": "missing",
+        "symptomEvidence": "not_covered",
         "affected": {
           "predicted": [],
           "expected": [
@@ -233,6 +342,7 @@
       "score": {
         "outcome": "inconclusive",
         "rootCause": "missing",
+        "symptomEvidence": "not_covered",
         "affected": {
           "predicted": [],
           "expected": [
@@ -283,6 +393,7 @@
       "score": {
         "outcome": "completed",
         "rootCause": "correct",
+        "symptomEvidence": "covered",
         "affected": {
           "predicted": [
             "cache-node",
@@ -333,6 +444,7 @@
       "score": {
         "outcome": "failed",
         "rootCause": "missing",
+        "symptomEvidence": "not_covered",
         "affected": {
           "predicted": [],
           "expected": [
@@ -389,13 +501,16 @@
     }
   ],
   "totals": {
-    "cases": 8,
+    "cases": 10,
     "byOutcome": {
-      "completed": 4,
+      "completed": 6,
       "failed": 3,
       "inconclusive": 1
     },
-    "rootCauseCorrect": 3,
+    "rootCauseCorrect": 4,
+    "rootCauseAmbiguous": 1,
+    "symptomEvidenceCovered": 4,
+    "rejectedForEvidence": 1,
     "answerLeaks": 0
   }
 }

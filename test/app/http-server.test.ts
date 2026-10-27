@@ -532,6 +532,27 @@ describe('investigations', () => {
     }
   });
 
+  it('re-checks a run’s citations over HTTP and answers a missing run with a structured error', async () => {
+    const { w, server } = await serve();
+    try {
+      const { runId } = (await post(server, { bundleId: w.excerptId })).json();
+      const r = await call(server, 'GET', `/api/runs/${runId}/evidence`);
+      expect(r.status).toBe(200);
+      const checked = r.json() as unknown as { status: string; citations: { status: string }[] };
+      expect(checked.status).toBe('checked');
+      expect(checked.citations.length).toBeGreaterThan(0);
+      expect(checked.citations.every((c) => c.status === 'verified')).toBe(true);
+      expect(r.text).not.toContain(w.bundlesDir);
+      expect((await call(server, 'GET', '/api/runs/20261027T000000Z-nocase/evidence')).status).toBe(
+        404,
+      );
+      expect((await call(server, 'GET', '/api/runs/..%2fx/evidence')).status).toBe(400);
+      expect((await call(server, 'POST', `/api/runs/${runId}/evidence`)).status).toBe(405);
+    } finally {
+      await server.close();
+    }
+  });
+
   it('reports a damaged run as unreadable without leaking its content', async () => {
     const { w, server } = await serve();
     try {

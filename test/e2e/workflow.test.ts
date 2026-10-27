@@ -166,6 +166,10 @@ async function startOllamaStub(chatText: () => string): Promise<OllamaStubServer
         res.writeHead(status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(doc));
       };
+      if (req.url === '/api/status') {
+        send(200, { cloud: { disabled: true, source: 'env' } });
+        return;
+      }
       if (req.url === '/api/tags') {
         send(200, {
           models: [
@@ -224,6 +228,19 @@ let readyMark = 0;
 let fakeRunId = '';
 let ollamaRunId = '';
 let ollamaText = '';
+
+/** The application re-reads the cited records from the bundle: every citation verifies, no model runs. */
+async function citationsRecheck(runId: string) {
+  const r = await http(uiPort, 'GET', `/api/runs/${runId}/evidence`);
+  expect(r.status).toBe(200);
+  const body = r.json() as unknown as {
+    status: string;
+    citations: { status: string; excerpt: string }[];
+  };
+  expect(body.status).toBe('checked');
+  expect(body.citations.length).toBeGreaterThan(0);
+  expect(body.citations.every((c) => c.status === 'verified' && c.excerpt.length > 0)).toBe(true);
+}
 
 /** Every citation resolves to a real line of the bundle and quotes values found on it. */
 async function citationsAreInTheBundle(result: InvestigationResult) {
@@ -343,6 +360,7 @@ describe('local workflow, as real processes', { timeout: 120_000 }, () => {
     expect(read.result.limitations.join(' ')).toContain('SIMULATED');
     expect(read.result.findings.map((f) => f.kind)).toEqual(['symptom']);
     await citationsAreInTheBundle(read.result);
+    await citationsRecheck(fakeRunId);
   });
 
   it('rejects malformed requests, bad ids and missing things with structured errors', async () => {
@@ -433,6 +451,7 @@ describe('local workflow, as real processes', { timeout: 120_000 }, () => {
       expect(stored.result.run).toMatchObject({ provider: 'ollama', model: 'tiny:1b' });
       expect(stored.result.outcome).toBe('completed');
       await citationsAreInTheBundle(stored.result);
+      await citationsRecheck(ollamaRunId);
 
       // A reply that cites a record the bundle does not have is rejected, never repaired into success.
       const good = goodOutput(view);

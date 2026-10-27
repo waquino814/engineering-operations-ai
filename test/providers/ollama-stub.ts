@@ -10,6 +10,8 @@ export function ollamaStub(
     models?: StubModel[];
     chat?: (body: Record<string, unknown>) => { status?: number; body: unknown } | Promise<never>;
     down?: boolean;
+    /** What `GET /api/status` answers; by default cloud features are reported disabled. */
+    status?: { status?: number; body: unknown };
   } = {},
 ) {
   const calls: { method: string; path: string; body: Record<string, unknown> | undefined }[] = [];
@@ -28,6 +30,10 @@ export function ollamaStub(
       init.body === undefined ? undefined : (JSON.parse(init.body) as Record<string, unknown>);
     calls.push({ method: init.method, path, body });
     if (options.down) return Promise.reject(new Error('connect ECONNREFUSED'));
+    if (path === '/api/status') {
+      const out = options.status ?? { body: { cloud: { disabled: true, source: 'env' } } };
+      return reply(out.status ?? 200, out.body);
+    }
     if (path === '/api/tags')
       return reply(200, {
         models: models.map((m) => ({

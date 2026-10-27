@@ -33,21 +33,33 @@ describe('the synthetic evaluation', () => {
         c.summary.outcome,
         c.summary.failureClass,
         c.score?.rootCause ?? null,
+        c.score?.symptomEvidence ?? null,
       ]),
     ).toEqual([
-      ['excerpt-correct', 'completed', null, 'correct'],
-      ['excerpt-wrong-root-cause', 'completed', null, 'incorrect'],
-      ['excerpt-repaired-reply', 'completed', null, 'correct'],
-      ['excerpt-fabricated-evidence', 'failed', 'evidence_verification_failed', 'missing'],
-      ['excerpt-inconclusive', 'inconclusive', null, 'missing'],
-      ['fabricated-correct', 'completed', null, 'correct'],
-      ['fabricated-provider-down', 'failed', 'provider_unavailable', 'missing'],
-      ['tampered-bundle', 'failed', 'invalid_bundle', null],
+      ['excerpt-correct', 'completed', null, 'correct', 'covered'],
+      ['excerpt-wrong-root-cause', 'completed', null, 'incorrect', 'not_covered'],
+      ['excerpt-conflicting-root-causes', 'completed', null, 'ambiguous', 'covered'],
+      ['excerpt-correct-without-symptom-evidence', 'completed', null, 'correct', 'not_covered'],
+      ['excerpt-repaired-reply', 'completed', null, 'correct', 'covered'],
+      [
+        'excerpt-fabricated-evidence',
+        'failed',
+        'evidence_verification_failed',
+        'missing',
+        'not_covered',
+      ],
+      ['excerpt-inconclusive', 'inconclusive', null, 'missing', 'not_covered'],
+      ['fabricated-correct', 'completed', null, 'correct', 'covered'],
+      ['fabricated-provider-down', 'failed', 'provider_unavailable', 'missing', 'not_covered'],
+      ['tampered-bundle', 'failed', 'invalid_bundle', null, null],
     ]);
     expect(report.totals).toEqual({
-      cases: 8,
-      byOutcome: { completed: 4, failed: 3, inconclusive: 1 },
-      rootCauseCorrect: 3,
+      cases: 10,
+      byOutcome: { completed: 6, failed: 3, inconclusive: 1 },
+      rootCauseCorrect: 4,
+      rootCauseAmbiguous: 1,
+      symptomEvidenceCovered: 4,
+      rejectedForEvidence: 1,
       answerLeaks: 0,
     });
     expect(report.cases.every((c) => c.kind === 'synthetic')).toBe(true);
@@ -171,9 +183,25 @@ describe('scoring', () => {
     scenario: 's',
     rootCauseComponent: 'cache-node',
     affectedComponents: ['cache-node', 'orders-api'],
+    primarySymptom: {
+      metric: 'cache_requests_total',
+      matchers: { job: 'orders-api', result: 'error' },
+    },
   };
-  const result = (findings: { kind: string; components: string[] }[]) =>
-    ({ outcome: 'completed', findings }) as unknown as InvestigationResult;
+  interface F {
+    kind: string;
+    components: string[];
+    evidence?: { file: string; series?: { name: string; labels: Record<string, string> } }[];
+  }
+  const result = (findings: F[]) =>
+    ({
+      outcome: 'completed',
+      findings: findings.map((f) => ({ evidence: [], ...f })),
+    }) as unknown as InvestigationResult;
+  const series = (name: string, labels: Record<string, string>) => ({
+    file: 'metrics.jsonl',
+    series: { name, labels },
+  });
 
   it('scores the root cause and the affected components separately', () => {
     expect(
@@ -187,6 +215,7 @@ describe('scoring', () => {
     ).toEqual({
       outcome: 'completed',
       rootCause: 'correct',
+      symptomEvidence: 'not_covered',
       affected: {
         predicted: ['cache-node', 'orders-api', 'worker'],
         expected: ['cache-node', 'orders-api'],
@@ -204,12 +233,54 @@ describe('scoring', () => {
     expect(scoreResult(result([]), { ...key, affectedComponents: [] }).affected.recall).toBe(1);
   });
 
+  it('calls a result that names two root-cause components ambiguous, even if one is right', () => {
+    const both = result([
+      { kind: 'root_cause', components: ['cache-node'] },
+      { kind: 'root_cause', components: ['worker'] },
+    ]);
+    expect(scoreResult(both, key).rootCause).toBe('ambiguous');
+    // The same component twice, or in one finding, is not a conflict.
+    expect(
+      scoreResult(
+        result([
+          { kind: 'root_cause', components: ['cache-node'] },
+          { kind: 'root_cause', components: ['cache-node'] },
+        ]),
+        key,
+      ).rootCause,
+    ).toBe('correct');
+  });
+
+  it('scores whether a finding cites the series of the primary symptom, with its labels', () => {
+    const cites = (name: string, labels: Record<string, string>) =>
+      scoreResult(
+        result([
+          { kind: 'root_cause', components: ['cache-node'], evidence: [series(name, labels)] },
+        ]),
+        key,
+      ).symptomEvidence;
+    const ok = { job: 'orders-api', result: 'error', extra: 'x' };
+    expect(cites('cache_requests_total', ok)).toBe('covered');
+    expect(cites('cache_requests_total', { job: 'orders-api', result: 'ok' })).toBe('not_covered');
+    expect(cites('cache_requests_total', { job: 'orders-api' })).toBe('not_covered');
+    expect(cites('other_total', ok)).toBe('not_covered');
+    const logs = result([
+      { kind: 'root_cause', components: ['cache-node'], evidence: [{ file: 'logs.jsonl' }] },
+    ]);
+    expect(scoreResult(logs, key).symptomEvidence).toBe('not_covered');
+    expect(scoreResult(result([]), key).symptomEvidence).toBe('not_covered');
+  });
+
   it('reads the answer key only through the scoring boundary, and validates it', async () => {
     const key2 = await readAnswerKey((await bundles()).fabricated);
     expect(key2).toMatchObject({
       scenario: 'synthetic-cache-saturation',
       rootCauseComponent: 'cache-node',
       affectedComponents: ['cache-node', 'orders-api'],
+      primarySymptom: {
+        metric: 'cache_requests_total',
+        matchers: { job: 'orders-api', result: 'error' },
+      },
     });
     const broken = await makeBundle({ files: { 'ground_truth.json': '{}\n' } });
     await expect(readAnswerKey(broken)).rejects.toThrow(

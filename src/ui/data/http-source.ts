@@ -1,6 +1,7 @@
 import { readInvestigationResult } from '../../investigation/result.ts';
 import type {
   BundleIssue,
+  CitationCheck,
   BundleOption,
   BundleValidation,
   InvestigationDataSource,
@@ -131,6 +132,46 @@ export function createHttpSource(
         models: b['models'],
         reason: b['reason'],
       };
+    },
+    async getEvidence(id) {
+      const b = await ok(`/api/runs/${encodeURIComponent(id)}/evidence`);
+      if (b['status'] === 'unavailable') {
+        const reason = b['reason'];
+        if (
+          reason !== 'not_admitted' &&
+          reason !== 'no_bundle_recorded' &&
+          reason !== 'bundle_not_found'
+        )
+          throw new ApiError('The evidence response is malformed.');
+        return { status: 'unavailable', reason };
+      }
+      const list = b['citations'];
+      if (b['status'] !== 'checked' || !Array.isArray(list))
+        throw new ApiError('The evidence response is malformed.');
+      const statuses = [
+        'verified',
+        'file_changed',
+        'line_missing',
+        'identity_mismatch',
+        'unreadable',
+      ];
+      const citations: CitationCheck[] = list.map((c: unknown) => {
+        if (
+          !isObject(c) ||
+          typeof c['findingId'] !== 'string' ||
+          typeof c['file'] !== 'string' ||
+          typeof c['line'] !== 'number' ||
+          typeof c['status'] !== 'string' ||
+          !statuses.includes(c['status']) ||
+          (c['excerpt'] !== null && typeof c['excerpt'] !== 'string') ||
+          typeof c['truncated'] !== 'boolean' ||
+          !Array.isArray(c['issues']) ||
+          !c['issues'].every((i) => typeof i === 'string')
+        )
+          throw new ApiError('The evidence response is malformed.');
+        return c as unknown as CitationCheck;
+      });
+      return { status: 'checked', citations };
     },
     async getSettings() {
       return parseSettings(await ok('/api/settings'));

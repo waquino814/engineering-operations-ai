@@ -95,7 +95,12 @@ describe('the application with Ollama', () => {
     });
     expect(readInvestigationResult(out.result).ok).toBe(true);
     // Verification ran before the prompt: tags and show first, then exactly one chat.
-    expect(stub.calls.map((c) => c.path)).toEqual(['/api/tags', '/api/show', '/api/chat']);
+    expect(stub.calls.map((c) => c.path)).toEqual([
+      '/api/tags',
+      '/api/status',
+      '/api/show',
+      '/api/chat',
+    ]);
   });
 
   it('rejects a reply that cites a record the bundle does not have, and a malformed or empty reply', async () => {
@@ -182,6 +187,31 @@ describe('the application with Ollama', () => {
       expect(out).toMatchObject({ status: 'refused', reason: 'provider_blocked' });
       expect(stub.calls.some((c) => c.path === '/api/chat')).toBe(false);
     }
+  });
+
+  it('blocks a real run, before any prompt, when Ollama reports its cloud features enabled', async () => {
+    const w = await workspace();
+    const stub = ollamaStub({
+      status: { body: { cloud: { disabled: false, source: 'none' } } },
+      chat: () => chatReply('{}'),
+    });
+    const app = createApplication(w.env({ EOAI_MODEL_PROVIDER: 'ollama' }), {
+      ollamaFetch: stub.fetch,
+    });
+    const status = await app.getProviderStatus();
+    expect(status).toMatchObject({
+      selected: 'ollama',
+      runnable: false,
+      simulated: false,
+      models: ['tiny:1b'],
+    });
+    expect(status.reason).toContain('cloud features are enabled');
+    expect(status.reason).toContain('OLLAMA_NO_CLOUD=1');
+    const out = await app.startInvestigation(w.excerptId);
+    expect(out).toMatchObject({ status: 'refused', reason: 'provider_blocked' });
+    expect(stub.calls.some((c) => c.path === '/api/chat')).toBe(false);
+    // No silent fallback: nothing was stored from any provider.
+    expect(await app.listRuns()).toEqual([]);
   });
 
   it('uses the model chosen in settings, and says when it is not installed', async () => {
