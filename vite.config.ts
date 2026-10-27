@@ -9,6 +9,8 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   root: fileURLToPath(new URL('./src/ui/', import.meta.url)),
   base: './',
+  // Development only: forward the console's API calls to the local application (`pnpm serve`).
+  server: { proxy: { '/api': 'http://127.0.0.1:8787', '/healthz': 'http://127.0.0.1:8787' } },
   build: {
     outDir: fileURLToPath(new URL('./dist/ui/', import.meta.url)),
     emptyOutDir: true,

@@ -109,7 +109,8 @@ describe('settings', () => {
     renderAt('#/settings');
     const main = screen.getByRole('main');
     expect(main.textContent).toContain(fixtures.notice);
-    expect(main.textContent).toContain('None configured. Real providers arrive in milestone E5.');
+    expect(main.textContent).toContain('No runnable provider.');
+    expect(main.textContent).toContain('No hosted model can be enabled here.');
     expect(main.textContent).toContain('investigation-result 0.1.0');
     expect(main.textContent).toContain('maxTotalTokens816,000');
     expect(within(main).queryAllByRole('textbox')).toEqual([]);

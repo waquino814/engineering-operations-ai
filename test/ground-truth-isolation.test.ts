@@ -296,8 +296,10 @@ describe('the source tree', () => {
       .filter(({ text }) => /from '(\.\.\/|\.\/)(intake\/)?validate-bundle\.ts'/.test(text))
       .map(({ file }) => file);
     // The console's fixture generator validates its fixture bundles (ADR 0011); it never opens
-    // evidence for an investigation itself, which runs through the pipeline.
+    // evidence for an investigation itself, which runs through the pipeline. The application layer
+    // validates a bundle for the operator (ADR 0012); its report never reaches the investigator.
     expect(importers.sort()).toEqual([
+      'app/application.ts',
       'cli.ts',
       'evaluation/ui-fixtures.ts',
       'index.ts',

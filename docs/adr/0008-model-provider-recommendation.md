@@ -1,8 +1,21 @@
 # 0008: Model provider recommendation
 
-- **Status:** Accepted by the owner (2026-10-27) as the first provider, with the derived provider-safe schema and full internal result validation retained, and `@anthropic-ai/sdk` approved for the adapter directory only. **Not confirmed**: acceptance criteria 3 and 4 below are open, and no credential, budget or real call has been approved or made. It is the amendment to [ADR 0002](0002-ai-provider-and-external-api-policy.md) that ADR 0002 anticipates.
+- **Status:** Accepted by the owner (2026-10-27) as the first provider; **superseded in part the same day** by the absolute no-additional-spending policy and [ADR 0013](0013-zero-spend-local-inference.md) (see "Supersession note"). The original status text follows as history: Accepted by the owner (2026-10-27) as the first provider, with the derived provider-safe schema and full internal result validation retained, and `@anthropic-ai/sdk` approved for the adapter directory only. **Not confirmed**: acceptance criteria 3 and 4 below are open, and no credential, budget or real call has been approved or made. It is the amendment to [ADR 0002](0002-ai-provider-and-external-api-policy.md) that ADR 0002 anticipates.
 - **Date:** 2026-10-26
 - **Depends on (accepted):** [0002](0002-ai-provider-and-external-api-policy.md) (port, opt-in external calls, credentials, budgets), [0003](0003-ground-truth-isolation.md). Proposed companions: [0006](0006-investigation-pipeline-and-limits.md) (port, token budget), [0007](0007-evidence-grounding-and-output-validation.md).
+
+## Supersession note (2026-10-27)
+
+This record is kept as history; the text below it is not rewritten. The owner has since set a policy that overrides its operational parts:
+
+> **Absolute no-additional-spending constraint:** No application path, configuration setting, provider selector, UI control, or command-line option may initiate a hosted AI request or incur additional AI-service charges. Only deterministic fake execution and verified local-only inference are permitted. If local-only operation cannot be verified, execution must fail closed.
+
+What this means for ADR 0008:
+
+- **Hosted execution is out of the runnable application.** The runnable application may allow only the `fake` and `local` providers ([ADR 0013](0013-zero-spend-local-inference.md), proposed). The Anthropic adapter, its mapping, derived schema, tests and the pinned SDK stay in the repository, but must be unreachable from runnable application execution. No provider selector, credential, environment variable or UI option may enable hosted execution.
+- **Withdrawn:** "Configuration" (`EOAI_MODEL_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`), and acceptance criteria 3 and 4 (a budgeted real-bundle evaluation; cost and data-handling acceptance). No hosted evaluation, account-specific verification or live check is planned, and the rows of "Verification required before approval" that need an account or a live request will not be pursued.
+- **Retained as record:** the documentation-based verification (2026-10-27), the derived-schema decision and the adapter's unit-tested mapping, which remain correct descriptions of that adapter.
+- **Implementation follow-up, not done here:** `src/providers/select.ts` can still construct the Anthropic provider when `EOAI_MODEL_PROVIDER=anthropic` is set. The application layer's provider gate (ADR 0012, ADR 0013) must make that unreachable from runnable execution, with tests; the gate now exists in `src/app/provider-gate.ts` (uncommitted, 2026-10-27): the application and CLI never import `src/providers/`, enforced by `test/architecture.test.ts`. `selectProvider` itself is unchanged and unused by runnable code.
 
 ## Context
 
@@ -68,7 +81,8 @@ Checked against platform.claude.com documentation (models overview, structured o
 ## Not done in this change
 
 - Added in E5 (no network): the pure request, usage, error and reply mapping, the derived wire schema, and the streaming `AnthropicProvider` over an injected client, in `src/providers/anthropic/`, with unit tests using a stubbed client. `@anthropic-ai/sdk` 1.0.0 (pinned; the first release on API version 2026-10-21) is a dependency, imported only by `provider.ts`; `test/architecture.test.ts` enforces that.
-- Not yet done: wiring configuration (`EOAI_MODEL_PROVIDER`, the key from the environment) into the pipeline; the opt-in real-bundle evaluation.
+- Provider selection (`src/providers/select.ts`): `EOAI_MODEL_PROVIDER` unset, empty or `fake` gives the fake provider; `anthropic` requires `ANTHROPIC_API_KEY` and `EOAI_ANTHROPIC_MODEL` (no default model), with optional `EOAI_ANTHROPIC_EFFORT`. Any other value, or a missing setting, throws `ProviderConfigError` naming variables, never values; there is no fallback in either direction. It takes the environment as an argument and makes no request. The variable names for model and effort are this change's choice, as the ADR named only the first two.
+- Not yet done: calling `selectProvider` from an application startup (none exists before E6's boundary ADR; the CLI only validates bundles); the opt-in real-bundle evaluation.
 - The architecture guard still forbids every other provider SDK, and the Anthropic SDK outside the adapter directory.
 - No API call, no key, no cost.
 

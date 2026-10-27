@@ -2,19 +2,26 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
 import { createFixtureSource } from './data/fixture-source.ts';
-import type { UiFixtures } from './data/types.ts';
+import { createHttpSource } from './data/http-source.ts';
+import type { InvestigationDataSource, UiFixtures } from './data/types.ts';
 import fixtures from './fixtures/fixtures.json' with { type: 'json' };
 import './styles.css';
 
 /**
- * The console's entry point. In E4 the data source is the committed fixtures; E6 replaces this
- * one line with a source for the application boundary.
+ * The console's entry point. By default the data source is the local application over HTTP
+ * (ADR 0012); `VITE_EOAI_SOURCE=fixture` at build or dev time selects the committed fixtures.
  */
-export function mount(element: HTMLElement) {
+export function defaultSource(): InvestigationDataSource {
+  return import.meta.env.VITE_EOAI_SOURCE === 'fixture'
+    ? createFixtureSource(fixtures as UiFixtures)
+    : createHttpSource();
+}
+
+export function mount(element: HTMLElement, source: InvestigationDataSource = defaultSource()) {
   const root = createRoot(element);
   root.render(
     <StrictMode>
-      <App source={createFixtureSource(fixtures as UiFixtures)} />
+      <App source={source} />
     </StrictMode>,
   );
   return root;

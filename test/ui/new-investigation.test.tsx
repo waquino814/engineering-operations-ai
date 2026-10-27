@@ -162,6 +162,36 @@ describe('starting and uploading', () => {
     expect(within(notice).queryAllByRole('link')).toEqual([]);
   });
 
+  it('shows a failed start as an alert and never as a started investigation', async () => {
+    renderAt(
+      '#/new',
+      sourceWith({
+        startInvestigation: () =>
+          Promise.resolve({ status: 'error', message: 'an investigation is already running' }),
+      }),
+    );
+    await choose('Fixture bundle B');
+    await within(panel('2. Validation')).findByText(/^Valid/);
+    fireEvent.click(within(panel('3. Start')).getByRole('button', { name: 'Start investigation' }));
+    const alert = await within(panel('3. Start')).findByRole('alert');
+    expect(alert.textContent).toContain('did not start: an investigation is already running');
+    expect(within(panel('3. Start')).queryAllByRole('link')).toEqual([]);
+    expect(within(panel('3. Start')).queryByText(/Started/)).toBeNull();
+  });
+
+  it('shows a rejected start request as an alert too', async () => {
+    renderAt(
+      '#/new',
+      sourceWith({ startInvestigation: () => Promise.reject(new Error('connection lost')) }),
+    );
+    await choose('Fixture bundle B');
+    await within(panel('2. Validation')).findByText(/^Valid/);
+    fireEvent.click(within(panel('3. Start')).getByRole('button', { name: 'Start investigation' }));
+    expect((await within(panel('3. Start')).findByRole('alert')).textContent).toContain(
+      'connection lost',
+    );
+  });
+
   it('links to the new investigation when a data source can start one', async () => {
     renderAt(
       '#/new',

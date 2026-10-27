@@ -8,8 +8,8 @@ import type { InvestigationResult } from '../../investigation/result.ts';
  * contract itself (ADR 0004 as amended by ADR 0010); nothing here restates their fields.
  */
 
-/** Where a record came from. Only fixtures exist until E6. */
-export type Origin = 'fixture';
+/** Where a record came from: committed fixtures, or the local application (ADR 0012). */
+export type Origin = 'fixture' | 'local';
 
 /** A bundle an operator can choose, with what is known about it. */
 export interface BundleOption {
@@ -61,6 +61,8 @@ export interface Unavailable {
 
 export type StartOutcome =
   | { status: 'started'; investigationId: string }
+  /** The request failed; nothing was started. Never shown as a result. */
+  | { status: 'error'; message: string }
   | (Unavailable & {
       /** Precomputed fixture investigations for the same bundle. */ fixtureInvestigationIds: string[];
     });

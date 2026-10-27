@@ -1,7 +1,9 @@
 # 0002: AI provider and external API policy
 
-- **Status:** Accepted (2026-10-26), approved by the repository owner after the E1 review. The model and provider themselves are still to be chosen in E2, as an amendment.
+- **Status:** Accepted (2026-10-26), approved by the repository owner after the E1 review. The model and provider themselves are still to be chosen in E2, as an amendment. **Amended in part (2026-10-27):** the owner's absolute no-additional-spending policy (below) replaces this ADR's "external calls only when explicitly configured" opt-in for the runnable application; see ADR 0013. The port, the untrusted-telemetry rule and "no AI calls in tests or CI" stand.
 - **Date:** 2026-10-26
+
+> **Absolute no-additional-spending constraint:** No application path, configuration setting, provider selector, UI control, or command-line option may initiate a hosted AI request or incur additional AI-service charges. Only deterministic fake execution and verified local-only inference are permitted. If local-only operation cannot be verified, execution must fail closed.
 
 ## Context
 

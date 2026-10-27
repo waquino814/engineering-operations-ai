@@ -128,7 +128,13 @@ export function NewInvestigation({ source }: { source: InvestigationDataSource }
             className="button button--primary"
             disabled={!valid || selected === null}
             onClick={() => {
-              if (selected) void source.startInvestigation(selected).then(setStart);
+              if (selected)
+                void source.startInvestigation(selected).then(setStart, (err: unknown) => {
+                  setStart({
+                    status: 'error',
+                    message: err instanceof Error ? err.message : String(err),
+                  });
+                });
             }}
           >
             Start investigation
@@ -149,6 +155,11 @@ export function NewInvestigation({ source }: { source: InvestigationDataSource }
                 </>
               )}
             </div>
+          )}
+          {start?.status === 'error' && (
+            <p className="notice notice--error" role="alert">
+              The investigation did not start: {start.message}
+            </p>
           )}
           {start?.status === 'started' && (
             <p className="notice" role="status">

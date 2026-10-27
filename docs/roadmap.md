@@ -4,6 +4,12 @@ Status: **proposed**, with one owner decision. The portfolio order, this backend
 
 ## Milestone order
 
+**Owner policy (2026-10-27):**
+
+> **Absolute no-additional-spending constraint:** No application path, configuration setting, provider selector, UI control, or command-line option may initiate a hosted AI request or incur additional AI-service charges. Only deterministic fake execution and verified local-only inference are permitted. If local-only operation cannot be verified, execution must fail closed.
+
+It overrides every milestone below. The runnable application may allow only `fake` and `local` ([ADR 0013](adr/0013-zero-spend-local-inference.md), proposed); the hosted adapter stays in the repository but unreachable.
+
 **Owner decision (2026-10-26): build the investigation UI before integrating a real AI provider.** Milestone IDs are stable: completed and in-progress records keep their numbers, and the scope still open in E2 and E3 moves to new milestones E5 to E7.
 
 | Order | Milestone                                                | Status                                                                          | Depends on                                                                                  |
@@ -11,8 +17,8 @@ Status: **proposed**, with one owner decision. The portfolio order, this backend
 |     1 | E0 Foundation, E1 intake                                 | complete                                                                        | —                                                                                           |
 |     1 | E2 investigation backend, E3 evaluation: the foundations | foundations delivered (`a65e5b9`); not complete; remaining scope moved to E5–E7 | E1                                                                                          |
 |     2 | E4 Investigation UI                                      | complete (2026-10-26): commit `43d5987`, CI passed                              | E2/E3 foundations and the result contract; **no** provider, credentials or external AI call |
-|     3 | E5 Provider integration                                  | in progress (adapter, no network)                                               | owner approval of ADR 0008 after its verification; credentials and a spending budget        |
-|     4 | E6 End-to-end integration                                | not started                                                                     | E4, E5, and an ADR for the application/API boundary                                         |
+|     3 | E5 Provider integration                                  | in progress (adapter, no network); revised 2026-10-27                           | the no-spending policy; ADR 0013 (proposed): a verified local provider; no credentials      |
+|     4 | E6 End-to-end integration                                | not started; ADR 0012 partly accepted                                           | E4, the application boundary (ADR 0012), a permitted provider (`fake` or verified `local`)  |
 |     5 | E7 Evaluation and hardening                              | not started                                                                     | E6; varied-timing bundles from Commerce Platform for full coverage                          |
 
 Why this order is consistent with the decisions in force:
@@ -93,7 +99,7 @@ In progress or blocked:
 - [ ] A real bundle investigated by a real model, with a verified result.
 - [ ] Semantic support of findings: whether cited evidence supports the statement is not assessed.
 
-Done when a real Commerce Platform bundle produces a schema-valid, reference-verified result from an approved provider, within its limits, and the ADRs are accepted. After the reorder, that criterion is met by E5 (adapter) and E6 (end to end); owner review of ADRs 0006, 0007 and 0010 stays here.
+Done when a real Commerce Platform bundle produces a schema-valid, reference-verified result from an approved provider, within its limits, and the ADRs are accepted. After the reorder, that criterion is carried by E5 and E6, read as "a permitted provider" (`fake` or verified `local`) under the 2026-10-27 no-spending policy, not a hosted one; owner review of ADRs 0006, 0007 and 0010 stays here.
 
 ## E3: Evaluation
 
@@ -177,24 +183,27 @@ An operator-facing investigation console, inside this repository, built on deter
 
 ## E5: Provider integration
 
-**Status: in progress (2026-10-27), uncommitted.** ADR 0008 accepted by the owner. Done: verification against official docs, the derived wire schema, request/usage/error/reply mapping, and the streaming adapter with the SDK pinned, tested with a stubbed client and no network. Open: environment configuration wiring, the facts ADR 0008 marks open, credentials and a budget, and the controlled evaluation. After E4. Carries forward E2's provider scope.
+**Status: in progress (revised 2026-10-27), uncommitted.** Under the no-spending policy, E5 no longer integrates a hosted provider. Delivered so far, with no network: the Anthropic adapter, mapping, derived schema and provider selection, with stubbed-client tests. [ADR 0008](adr/0008-model-provider-recommendation.md) is superseded in part: the adapter stays in the repository but must be unreachable from runnable execution, and its funded evaluation is withdrawn. **Out of scope:** hosted-provider verification, credentials, budgets, and any work that needs spending.
 
-- Verify ADR 0008's facts against the provider's current official documentation ([ADR 0008](adr/0008-model-provider-recommendation.md), "Verification required before approval"), then the owner approves, revises or rejects ADR 0008.
-- Finalize provider-specific token accounting and configuration: map the provider's usage fields (including cached input) into `UsageReport`; decide when an error may report zero usage; confirm `maxInputTokensPerCall` with the provider's token counting ([ADR 0006](adr/0006-investigation-pipeline-and-limits.md)).
-- Implement the adapter behind `ModelProvider`, with its error and usage mapping unit-tested without network; credentials only from the environment (ADR 0002).
-- A controlled, operator-run evaluation on real bundles, **only after the owner explicitly approves credentials and a spending budget**.
+Revised scope, [ADR 0013](adr/0013-zero-spend-local-inference.md) (proposed, awaiting the owner):
 
-Done when the adapter passes its tests, the controlled evaluation has run within its approved budget, and ADR 0008 is accepted.
+- A provider gate in the application layer that allows only `fake` and `local`, with tests that every other provider is refused.
+- A local provider (Ollama, loopback only) behind `ModelProvider`: a loopback endpoint validator, model policy with no default model, explicit discovery, error and usage mapping, all tested with injected clients and recorded fixtures, no Ollama, model or network in CI.
+- Local inference stays **blocked** until the local-only checks are implemented and tested. Open: cloud routing and model markers, structured-output and schema compatibility, token accounting, context limits.
+
+Done when the gate and the local provider pass their tests, the local-only checks are verified by implementation and tests and reviewed by the owner, and ADR 0013 is accepted. No hosted evaluation is a completion criterion. Not complete.
 
 ## E6: End-to-end integration
 
-**Status: not started.** After E4 and E5.
+**Status: not started.** [ADR 0012](adr/0012-application-boundary.md) is **partly accepted**: the application layer and the `investigate` CLI are approved as the first slice; uploads stay out of scope; one JSON file per run, no database. **Implemented locally (2026-10-27), not verified in CI:** the provider gate (`fake` and `local` allowlist; `anthropic` and unknown values refused, `local` blocked), the `src/app/` layer (configuration, bundle access, run store, orchestration), the `investigate` and `serve` CLI commands, the loopback HTTP server (E6b), and the console's HTTP data source with start-refusal and error states, all with tests. **Not done:** a local provider (so no investigation can run end to end), CI verification, uploads. After E4 and E5.
 
-- Decide, as an ADR, the application/API boundary between the UI and the pipeline: how runs are started, how bundles enter (amending ADR 0005 if uploads are accepted), where results and run history are stored, and how errors reach the UI. The boundary keeps ADR 0003's isolation: no path, validation report or answer key reaches the investigator.
-- Implement it with tests, and connect the UI to it in place of fixtures.
-- **Live end-to-end investigation requires this boundary and the E5 adapter**; until both exist, the UI shows fixtures only.
+Proposed sequence ([ADR 0013](adr/0013-zero-spend-local-inference.md)): **E6a** application boundary, then a verified local provider, then a configuration UI, then a separately decided server and further hardening.
 
-Done when an operator can validate a real bundle, start an investigation with the approved provider, and see the result in the UI, with tests for the boundary passing in CI.
+- The application layer owns configuration, provider construction, the provider gate, run storage and orchestration; startup is request-free; the investigator never chooses a provider (ADR 0003 isolation kept).
+- Implement it with tests. The UI is connected to it over the loopback server; fixtures remain available by build option.
+- Live end-to-end investigation requires this boundary and a permitted provider (`fake`, or `local` once verified); until then the UI shows fixtures only.
+
+Done when an operator can validate a real bundle, start an investigation with a permitted provider (verified `local`), and see the result in the UI, with tests for the boundary passing in CI. Not complete; the criterion cannot be met until a local provider is verified and the integration route is decided.
 
 ## E7: Evaluation and hardening
 

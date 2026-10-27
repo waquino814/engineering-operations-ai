@@ -59,6 +59,9 @@ describe('module boundaries', () => {
       .map(({ file }) => file)
       .sort();
     expect(fsUsers).toEqual([
+      'app/bundles.ts',
+      'app/http-server.ts',
+      'app/run-store.ts',
       'evaluation/cli.ts',
       'evaluation/ground-truth.ts',
       'evaluation/leakage.ts',
@@ -68,6 +71,55 @@ describe('module boundaries', () => {
       'intake/contract.ts',
       'intake/validate-bundle.ts',
     ]);
+  });
+
+  it('keeps the hosted adapter, its SDK and provider selection unreachable from the runnable application', async () => {
+    const all = new Map((await sources()).map(({ file, text }) => [file, text]));
+    // Everything the CLI and the application layer can import, transitively, by relative path.
+    const reachable = new Set<string>();
+    const visit = (file: string) => {
+      if (reachable.has(file)) return;
+      reachable.add(file);
+      for (const spec of imports(all.get(file) ?? '')) {
+        if (spec.startsWith('.')) visit(join(file, '..', spec).replace(/^\.\//, ''));
+      }
+    };
+    visit('cli.ts');
+    for (const file of all.keys()) if (file.startsWith('app/')) visit(file);
+    expect(reachable.size).toBeGreaterThan(10);
+    for (const file of reachable) {
+      expect(file, 'reachable from the runnable application').not.toMatch(/^providers\//);
+      for (const spec of imports(all.get(file) ?? ''))
+        expect(spec, `${file} imports ${spec}`).not.toMatch(/@anthropic-ai|providers\//);
+    }
+  });
+
+  it('lets only the loopback server listen, and only on a validated loopback host', async () => {
+    const users = (await sources())
+      .filter(({ text }) => /from 'node:http'/.test(text))
+      .map(({ file }) => file);
+    expect(users).toEqual([join('app', 'http-server.ts')]);
+    const text =
+      (await sources('app')).find((f) => f.file === join('app', 'http-server.ts'))?.text ?? '';
+    expect(text).not.toMatch(/0\.0\.0\.0|\.listen\(\d|listen\(\s*port/);
+    expect(text).toContain('resolveListenHost(options.host)');
+  });
+
+  it('limits the console to same-origin /api/ requests', async () => {
+    const text =
+      (await sources('ui')).find((f) => f.file === join('ui', 'data', 'http-source.ts'))?.text ??
+      '';
+    const paths = [...text.matchAll(/['"`](\/[A-Za-z][^'"`]*)['"`]/g)].map((m) => m[1] ?? '');
+    expect(paths.length).toBeGreaterThan(3);
+    for (const p of paths) expect(p, p).toMatch(/^\/api\//);
+    expect(text).not.toMatch(/https?:\/\//);
+  });
+
+  it('keeps the process environment out of the application layer: only the CLI entry reads it', async () => {
+    for (const { file, text } of await sources('app')) {
+      expect(text, file).not.toMatch(/process\.(env|argv)|createRequire|\bimport\(/);
+      expect(text, file).not.toMatch(/ground_truth|GROUND_TRUTH_FILE|readAnswerKey/);
+    }
   });
 
   it('keeps scoring code out of everything but evaluation', async () => {
@@ -129,10 +181,18 @@ describe('module boundaries', () => {
     ]);
   });
 
-  it('makes no network calls and bundles no AI provider SDK', async () => {
+  it('makes no outgoing network calls and bundles no AI provider SDK', async () => {
     for (const { file, text } of await sources()) {
+      // Narrow exceptions: the loopback server listens (it never calls out), and the console's
+      // HTTP source fetches its own origin's /api/ paths. Both are checked by tests below.
+      const listens = file === join('app', 'http-server.ts');
+      const fetches = file === join('ui', 'data', 'http-source.ts');
       expect(text, file).not.toMatch(
-        /\bfetch\(|XMLHttpRequest|WebSocket|from 'node:(http|https|net|tls|dgram)'/,
+        listens
+          ? /\bfetch\(|XMLHttpRequest|WebSocket|from 'node:(https|net|tls|dgram)'/
+          : fetches
+            ? /XMLHttpRequest|WebSocket|from 'node:/
+            : /\bfetch\(|XMLHttpRequest|WebSocket|from 'node:(http|https|net|tls|dgram)'/,
       );
       // ADR 0008: the Anthropic SDK is allowed in its adapter directory and nowhere else.
       const adapter = file.startsWith(join('providers', 'anthropic') + '/');
@@ -187,7 +247,9 @@ describe('module boundaries', () => {
         ).toBe(true);
       }
       expect(text, file).not.toMatch(
-        /node:|process\.|\bfetch\(|XMLHttpRequest|ground_truth|GROUND_TRUTH/,
+        file === join('ui', 'data', 'http-source.ts')
+          ? /node:|process\.|XMLHttpRequest|ground_truth|GROUND_TRUTH/
+          : /node:|process\.|\bfetch\(|XMLHttpRequest|ground_truth|GROUND_TRUTH/,
       );
     }
   });

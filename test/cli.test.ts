@@ -21,7 +21,9 @@ describe('cli', () => {
     for (const argv of [[], ['validate'], ['check', 'x'], ['validate', 'a', 'b']]) {
       const s = streams();
       expect(await main(argv, s.out, s.err)).toBe(2);
-      expect(s.text().err).toBe('usage: node src/cli.ts validate <bundle-dir> [--json]\n');
+      expect(s.text().err).toBe(
+        'usage: node src/cli.ts validate <bundle-dir> [--json]\n       node src/cli.ts investigate <bundle-id> [--json]\n       node src/cli.ts serve [--host <loopback-address>] [--port <n>]\n',
+      );
     }
   });
 

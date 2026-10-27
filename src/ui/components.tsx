@@ -53,6 +53,7 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 
 const ORIGINS: Record<Origin, { label: string; title: string }> = {
   fixture: { label: 'Fixture', title: 'Generated fixture data, not a live investigation' },
+  local: { label: 'Local', title: 'Stored by the local application on this machine' },
 };
 
 /** Says where a record came from; fixture data is always marked as such. */
