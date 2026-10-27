@@ -14,11 +14,12 @@ Start with the [project README](../README.md) for what the project is, what is s
 
 ## Use and verify it
 
-| Document                           | Read it for                                                                  |
-| ---------------------------------- | ---------------------------------------------------------------------------- |
-| [ui-visual-qa.md](ui-visual-qa.md) | Every console route and state, the screenshot index, defects found and fixed |
-| [testing.md](testing.md)           | Testing policy, the per-file coverage guard, test layers, fakes              |
-| [roadmap.md](roadmap.md)           | Milestone status (the source of truth), acceptance criteria, what is blocked |
+| Document                           | Read it for                                                                                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [proposals/](proposals/README.md)  | **Proposed, not accepted:** the decision register, remediation scoring, evidence-support assessment, observability and the Commerce data request |
+| [ui-visual-qa.md](ui-visual-qa.md) | Every console route and state, the screenshot index, defects found and fixed                                                                     |
+| [testing.md](testing.md)           | Testing policy, the per-file coverage guard, test layers, fakes                                                                                  |
+| [roadmap.md](roadmap.md)           | Milestone status (the source of truth), acceptance criteria, what is blocked                                                                     |
 
 ## Decisions and contracts
 

@@ -38,12 +38,24 @@ An engineer opens **Evaluations** in the console (or calls the API below), picks
 
 `pnpm eval:suite <suite-id|all> [--provider scripted|simulated] [--out <file>] [--baseline <file>]` runs the same suites offline, with no server, and prints one JSON document: `runs` (each in the stored-run format above, validated by the same reader) and a `gate`. Only `scripted` and `simulated` are accepted; a real local model runs only through the application's provider gate (ADR 0013), so this command can make no request and cannot spend anything. `--provider ollama` (or any other name) is a usage error and runs nothing.
 
-| Exit code | Meaning                                                                                                                                                           |
-| --------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|         0 | The gate passed.                                                                                                                                                  |
-|         1 | The gate failed: an answer leak, a result that fails its contract, a run the harness could not complete, or (with `--baseline`) a case that is worse than before. |
-|         2 | Usage or input error (unknown suite or option, unreadable baseline, output file already exists). Nothing ran.                                                     |
-|         3 | The development / held-out split was breached. No result is reported.                                                                                             |
+The gate (`src/evaluation/gate.ts`) judges two things only, and uses no threshold, weight or tolerance: "worse" means strictly worse on a value with a stated direction. A baseline is a document an earlier invocation wrote with `--out`.
+
+**Integrity findings** (every run, with or without a baseline): `run_schema_invalid` (the run fails the stored-run schema, which now also checks the shape of each case's score, grounding and scenario); `report_inconsistent` (the totals, metrics, scenario breakdown, reliability counts or status do not follow from the case reports, recomputed with the harness's own functions); `duplicate_case`; `case_not_reported` and `case_not_in_suite` (a scripted run against the suite definition); `answer_leak`; `result_invalid`; `grounding_missing` and `citation_unconfirmed` (an admitted case whose citations were not re-read, or that the independent re-read does not confirm); `run_incomplete`.
+
+**Regression findings** (with `--baseline`): `case_regressed` (names the case, the dimension and both values: root cause, symptom series cited, completion, affected recall, affected precision, citation grounding); `case_missing` and `case_unexpected` (a case in only one of the two runs, so a baseline that lost a case cannot pass); `metric_regressed` (an aggregate metric fell, or rose if lower is better, or was scored and no longer is, with numerator and denominator); `metric_unjudgeable` (a scored metric with no declared direction in `METRIC_DIRECTION`; a test requires every metric the harness scores to be declared); `split_changed`, `scenario_set_changed` and `case_scenario_changed` (the suite or a scenario moved between development and held-out since the baseline, a scenario vanished or appeared, or a case moved to another scenario); `baseline_missing_run` (no run of that suite, version and provider kind, or a baseline recorded for another version of the suite).
+
+**Unusable baselines are input errors (exit 2), not gate failures:** a baseline run that is incomplete, internally inconsistent (for example hand-edited), reports a case twice, or is one of several runs of the same suite, version and provider kind. Nothing can be judged against such a reference, and a gate that guessed would pass silently. A baseline written before `component_identified` existed (below) is inconsistent under this rule and must be re-recorded.
+
+The document's `gate` holds `passed`, `problems` (the findings as sentences, `suite: reason`) and `findings` (the same facts as fields: `code`, `suite`, `case`, `metric`, `reason`, `baseline`, `current`). The per-case rules are stricter than the console's comparison view (`compareRuns`), which still reports root cause, symptom series and outcome only; the two are not the same report.
+
+**Real models.** The strict rule is right for the deterministic suites. A real model's runs vary, so comparing them strictly would flag noise; extending this gate to a real model needs an owner-chosen tolerance rule and repeated runs, and none is invented here ([decision register](proposals/decision-register.md), D9).
+
+| Exit code | Meaning                                                                                                                   |
+| --------: | ------------------------------------------------------------------------------------------------------------------------- |
+|         0 | The gate passed.                                                                                                          |
+|         1 | The gate failed: any integrity or regression finding above.                                                               |
+|         2 | Usage or input error (unknown suite or option, unreadable or unusable baseline, output file already exists). Nothing ran. |
+|         3 | The development / held-out split was breached. No result is reported.                                                     |
 
 The gate is about integrity, not about the diagnoses: the scripted suites contain deliberately wrong, conflicting and fabricated diagnoses, so a wrong root cause there is an expected outcome and does not fail it. `--baseline` takes a document an earlier invocation wrote with `--out` and fails on any case of the same suite, version and provider kind whose root cause, symptom citation or outcome got worse (improvements are reported by the comparison, not counted as problems); a baseline with no run of that suite and kind fails the gate rather than passing silently. `--out` never overwrites an existing file. With a fixed clock the document is byte for byte repeatable; with the real clock, only timestamps and durations differ between invocations.
 
@@ -53,18 +65,31 @@ Passing this gate means the pipeline, verification, scoring and split still beha
 
 Each has a numerator and a denominator. "Admitted" means the bundle passed intake and was scored; a failed, over-budget or inconclusive admitted case is in the denominator and not in the numerator, and a not-admitted case is out of the diagnosis denominators but still counted in completion, validity and leak counts. An empty denominator is `not_applicable`, never zero.
 
-| Metric                                   | Numerator / denominator                                                                                                                 |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `root_cause_correct`                     | admitted cases whose single named root-cause component is the key's / admitted cases                                                    |
-| `root_cause_ambiguous` (lower is better) | admitted cases naming more than one root-cause component / admitted cases                                                               |
-| `affected_precision`                     | components named that the key lists as affected / components named, summed over admitted cases                                          |
-| `affected_recall`                        | affected components named / components the key lists, summed over admitted cases                                                        |
-| `symptom_evidence`                       | admitted cases in which a finding cites the primary-symptom series with its labels / admitted cases                                     |
-| `citation_grounding`                     | citations a second, independent read of the bundle confirms (record exists, identifiers match, file checksum unchanged) / all citations |
-| `completion`                             | cases ending completed or inconclusive / all cases                                                                                      |
-| `result_validity`                        | results valid against the contract / all cases                                                                                          |
-| `answer_leaks` (must be 0)               | cases with a protected value in a request or result metadata / all cases                                                                |
-| `remediation`                            | **not scored**: no rubric exists (see Limitations)                                                                                      |
+| Metric                                   | Numerator / denominator                                                                                                                                           |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `root_cause_correct`                     | admitted cases whose single named root-cause component is the key's / admitted cases                                                                              |
+| `root_cause_ambiguous` (lower is better) | admitted cases naming more than one root-cause component / admitted cases                                                                                         |
+| `affected_precision`                     | components named that the key lists as affected / components named, summed over admitted cases                                                                    |
+| `affected_recall`                        | affected components named / components the key lists, summed over admitted cases                                                                                  |
+| `symptom_evidence`                       | admitted cases in which a finding cites the primary-symptom series with its labels / admitted cases                                                               |
+| `component_identified` (descriptive)     | components findings name (once per finding) that appear as a field value in a record the same finding cites / components named. Never gated as quality; see below |
+| `citation_grounding`                     | citations a second, independent read of the bundle confirms (record exists, identifiers match, file checksum unchanged) / all citations                           |
+| `completion`                             | cases ending completed or inconclusive / all cases                                                                                                                |
+| `result_validity`                        | results valid against the contract / all cases                                                                                                                    |
+| `answer_leaks` (must be 0)               | cases with a protected value in a request or result metadata / all cases                                                                                          |
+| `remediation`                            | **not scored**: no rubric exists (see Limitations)                                                                                                                |
+
+### Component evidence (descriptive)
+
+`src/evaluation/relations.ts` re-reads each cited record and checks whether each component a finding names appears as a string value in a record that same finding cites. It reports `named`, `identified` and the `unidentified` pairs per case, and the aggregate `component_identified`. It is a count, not a verdict: the correct root-cause finding of the committed scripted case names `payment-provider`, whose cited records imply it (`provider_unavailable`) without carrying the string, so it counts as not found. It does not show support or causation; those stay `not_assessed` ([proposal](proposals/finding-assessment.md)).
+
+### Is a bundle fit to evaluate with?
+
+```sh
+pnpm eval:readiness <bundle-dir> [--for development|held-out]
+```
+
+Reads files only and prints JSON `{ready, intendedSplit, scenario, findings}`; exit 0 ready, 1 not ready, 2 usage. It runs the consumer-side validation, then reports **blocking** findings (`bundle_invalid`, with each issue's rule, file, field and message and the bundle path scrubbed; `scenario_unregistered`; `split_conflict`; for `held-out`, `seed_used_for_tuning`) and **limitations** (`seed_used_for_tuning` for development, `fixed_fault_timing` at 30 s, `telemetry_truncated`). `TUNING_SEEDS` in `src/evaluation/suites.ts` lists the seeds the project was built on. This is a check on inputs; it is not evidence that held-out data exists ([data request](proposals/commerce-data-request.md)).
 
 ### The split
 
@@ -128,3 +153,4 @@ Not yet run. A local provider exists ([ADR 0013](adr/0013-zero-spend-local-infer
 - Reference verification proves that the cited records exist, were sent to the model, are intact and are quoted correctly, not that they support the claim (`semanticSupport: "not_assessed"`).
 - Leak detection is deterministic and has the limits listed above.
 - Token counts in the synthetic report are invented; they test accounting, not cost.
+- The gate and the readiness check test integrity and inputs. They do not establish that any model is good.

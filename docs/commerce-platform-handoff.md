@@ -59,6 +59,10 @@ Screenshots: [started](images/console-12-real-commerce-bundle-started.png), [res
 
 **What this does and does not show.** It shows the handoff works: a real bundle passes intake, is blinded and bounded, runs through the pipeline, and produces a schema-valid result whose citations resolve to real records. It does **not** show a diagnosis: the Fake provider cites the first records by position and says so ("no analysis was performed"), and semantic support is `Not assessed`. No real model has investigated a real bundle in this repository ([providers and safety](providers-and-safety.md)). No bundle was produced during this verification: no scenario was run.
 
+## What real held-out evaluation would need
+
+A concrete, proposed data request (scenarios, seeds, varied timing, required fields, validation steps and a leak checklist) is in [proposals/commerce-data-request.md](proposals/commerce-data-request.md). `pnpm eval:readiness <bundle-dir> --for held-out` checks a received bundle against it. Nothing there asks this repository to run a scenario, and no such bundle exists yet.
+
 ## Known limits of the handoff
 
 - Every real bundle so far faults exactly 30 s after load start, which telemetry can reveal; varying it is Commerce Platform's decision ([ADR 0003](adr/0003-ground-truth-isolation.md), "Remaining risks").
